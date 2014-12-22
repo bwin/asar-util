@@ -1,0 +1,2 @@
+/dir2/file2.png
+/dir2/file3.txt
