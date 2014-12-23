@@ -50,6 +50,10 @@ usageError = (msg) ->
 	help()
 	process.exit 1
 
+generalError = (msg) ->
+	console.error "#{msg}#{os.EOL}"
+	process.exit 1
+
 # show usage info (explicit)
 if argv.help or argv.h
 	help()
@@ -63,9 +67,11 @@ else if argv.create or argv.c
 	usageError 'not enough arguments for packing' if argv._.length < 2
 	[srcDir, destFile] = argv._
 	console.log "packing #{srcDir} to #{destFile}"
-	asar.createArchive srcDir, destFile, (err) ->
-		usageError err.message if err
-		#console.log "done."
+	try
+		asar.createArchive srcDir, destFile, (err) ->
+			generalError err.message if err
+	catch err
+		generalError err.message
 
 # extract archive
 else if argv.extract or argv.e
@@ -75,7 +81,7 @@ else if argv.extract or argv.e
 	try
 		asar.extractArchive archiveFilename, destDir, argv.root
 	catch err
-		usageError err.message
+		generalError err.message
 	#console.log "done."
 
 # list archive content with size
@@ -83,8 +89,11 @@ else if argv['list-size'] or (argv.l and argv.s)
 	usageError 'not enough arguments for listing' if argv._.length < 1
 	[archiveFilename] = argv._
 	console.log "listing #{archiveFilename}:#{argv.root}"
-	archive = asar.loadArchive archiveFilename
-	entries = archive.getEntries argv.root
+	try
+		archive = asar.loadArchive archiveFilename
+		entries = archive.getEntries argv.root
+	catch err
+		generalError err.message
 	for entry in entries
 		metadata = archive.getMetadata entry
 		line = entry
@@ -97,7 +106,10 @@ else if argv.list or argv.l
 	usageError 'not enough arguments for listing' if argv._.length < 1
 	[archiveFilename] = argv._
 	console.log "listing #{archiveFilename}:#{argv.root}"
-	entries = asar.getEntries archiveFilename, argv.root
+	try
+		entries = asar.getEntries archiveFilename, argv.root
+	catch err
+		generalError err.message
 	console.log entries.join os.EOL
 
 # show usage info (implicit)

@@ -1,5 +1,10 @@
 
 # TODO
+- [x] put archiveSize at the end
+- [x] add checksum
+- [ ] add verify command
+- [ ] ??? option to use short header keys (v, _, s, o, l) (expandHeaderKeys if header.v)
+- [ ] support symlinks
 - [x] extractFile
 - [x] extract
 - [x] rename args 'dest' to 'destDir' or 'destFilename'
