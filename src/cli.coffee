@@ -1,4 +1,5 @@
 
+fs = require 'fs'
 os = require 'os'
 path = require 'path'
 
@@ -8,45 +9,45 @@ asar = require './asar'
 pkg = require '../package'
 
 argv = minimist process.argv.slice(2),
-	string: ['_']
-	boolean: 'h help v version c create e extract l list s list-size a add verify q quiet verbose'.split ' '
+	string: ['_'] # i in o out a add r root
+	boolean: 'h help v version w l list s verify verbose q quiet'.split ' '
 	default:
 		root: '/'
 
 help = ->
-	console.log "Usage: #{pkg.name} ..."
-	console.log '-h, --help\tshow this'
-	console.log '-v, --version\toutput version info'
-
-	console.log '-c, --create <srcDir> <archive>'
-	console.log '\tcreate archive from scrDir'
-	console.log "\tExample: #{pkg.name} -c some/dir whatever.asar"
-
-	console.log '-e, --extract <archive> [--root=ROOTPATH] <destDir>'
-	console.log '\tExtract archive [in ROOTPATH] to destDir'
-	console.log "\tExample: #{pkg.name} -e whatever.asar to/here"
-	console.log "\tExample: #{pkg.name} -e whatever.asar --root=only/this to/here"
-
-	#console.log '-a, --add <srcDir> <archive>'
-	#console.log '\tadd srcDir to archive, overwriting existing files'
-	#console.log "\tExample: #{pkg.name} -a add/this/dir whatever.asar"
-
-	console.log '-l, --list <archive> [--root=ROOTPATH]'
-	console.log '-ls, --list-size <archive> [--root=ROOTPATH]'
-	console.log '\tlist files (optionally with size) in archive [in ROOTPATH]'
-	console.log "\tExample: #{pkg.name} -l whatever.asar"
-	console.log "\tExample: #{pkg.name} -l whatever.asar --root=only/this"
-	console.log "\tExample: #{pkg.name} -ls whatever.asar --root=only/this"
-
-	#console.log '--verify <archive>'
-	#console.log '\tverify integrity of archive'
-	#console.log "\tExample: #{pkg.name} --verify whatever.asar"
-	
-	#console.log '-q, --quiet\tbe silent'
-	#console.log '--verbose\tmore output'
+	console.log """
+#{pkg.name} [input] [output] [options]
+Parameter:
+input               path to archive or directory
+output              path to archive or directory
+or if you prefer, you can set these with:
+-i, --in <path>     specify input (can be archive or directory)
+-o, --out <path>    specify output (can be archive or directory)
+Options:
+-h, --help          show help and exit
+-v, --version       show version and exit
+-a, --add <path>    path to directory to add to archive
+-r, --root <path>   set root path in archive
+-w, --overwrite     overwrite files
+-l, --list          list archive entries
+-s, --size          also list size
+    --verify        verify archive integrity
+    --verbose       more feedback
+-q, --quiet         no feedback
+Examples:
+create archive from dir:            asar-util dir archive
+same with named parameters:         asar-util -i dir -o archive
+extract archive to dir:             asar-util archive dir
+extract root from archive to dir:   asar-util archive dir -r root
+extract d/file from archive to dir: asar-util archive dir -r d/file
+verify archive:                     asar-util archive --verify
+list archive entries:               asar-util archive -l
+list archive entries for root:      asar-util archive -l -r root
+list archive entries with size:     asar-util archive -ls
+	"""
 
 usageError = (msg) ->
-	console.error "#{msg}#{os.EOL}"
+	console.error "usage error: #{msg}#{os.EOL}"
 	help()
 	process.exit 1
 
@@ -54,65 +55,80 @@ generalError = (msg) ->
 	console.error "#{msg}#{os.EOL}"
 	process.exit 1
 
+showHelp = argv.help or argv.h
+showVersion = argv.version or argv.v
+input = argv.i or argv.in or argv._[0]
+output = argv.o or argv.out or argv._[1]
+root = argv.r or argv.root
+showList = argv.l or argv.list
+showListSize = argv.s or argv.size
+verify = argv.verify
+verbose = argv.verbose
+quiet = argv.q or argv.quiet
+
+#[input, output] = argv._
+
 # show usage info (explicit)
-if argv.help or argv.h
+if showHelp
 	help()
 
 # show version info
-else if argv.version or argv.v
+else if showVersion
 	console.log "v#{pkg.version}"
 
-# create archive
-else if argv.create or argv.c
-	usageError 'not enough arguments for packing' if argv._.length < 2
-	[srcDir, destFile] = argv._
-	console.log "packing #{srcDir} to #{destFile}"
-	try
-		asar.createArchive srcDir, destFile, (err) ->
-			generalError err.message if err
-	catch err
-		generalError err.message
+# we have at least an input
+else if input
+	if showList
+		usageError 'output and --list not allowed together' if output
+		usageError 'output and --verify not allowed together' if verify
+		usageError 'Y U MIX --list and --quiet ?! makes no sense' if quiet
+		console.log "listing #{input}:#{root}" if verbose
+		if showListSize
+			# list archive content with size
+			try
+				archive = asar.loadArchive input
+				entries = archive.getEntries root
+			catch err
+				generalError err.message
+			for entry in entries
+				metadata = archive.getMetadata entry
+				line = entry
+				line += path.sep if metadata.files?
+				line += "\t#{metadata.size}" if metadata.size
+				console.log line
+		else
+			# list archive content
+			try
+				entries = asar.getEntries input, root
+			catch err
+				generalError err.message
+			console.log entries.join os.EOL
 
-# extract archive
-else if argv.extract or argv.e
-	usageError 'not enough arguments for extracting' if argv._.length < 2
-	[archiveFilename, destDir] = argv._
-	console.log "extracting #{archiveFilename} to #{destDir}"
-	try
-		asar.extractArchive archiveFilename, destDir, argv.root
-	catch err
-		generalError err.message
-	#console.log "done."
+	else if showListSize then usageError '--size can only be used with --list'
 
-# list archive content with size
-else if argv['list-size'] or (argv.l and argv.s)
-	usageError 'not enough arguments for listing' if argv._.length < 1
-	[archiveFilename] = argv._
-	console.log "listing #{archiveFilename}:#{argv.root}"
-	try
-		archive = asar.loadArchive archiveFilename
-		entries = archive.getEntries argv.root
-	catch err
-		generalError err.message
-	for entry in entries
-		metadata = archive.getMetadata entry
-		line = entry
-		line += path.sep if metadata.files?
-		line += "\t#{metadata.size}" if metadata.size
-		console.log line
+	else if output
+		# transcode in -> out
+		inputStat = fs.lstatSync input
 
-# list archive content
-else if argv.list or argv.l
-	usageError 'not enough arguments for listing' if argv._.length < 1
-	[archiveFilename] = argv._
-	console.log "listing #{archiveFilename}:#{argv.root}"
-	try
-		entries = asar.getEntries archiveFilename, argv.root
-	catch err
-		generalError err.message
-	console.log entries.join os.EOL
+		if inputStat.isDirectory()
+			# create archive
+			console.log "packing #{input} to #{output}" if verbose
+			try
+				asar.createArchive input, output, (err) ->
+					generalError err.message if err
+			catch err
+				generalError err.message
+		else
+			# extract archive
+			console.log "extracting #{input}:#{root} to #{output}" if verbose
+			try
+				asar.extractArchive input, output, root
+			catch err
+				generalError err.message
+
+	# input but nothing else
+	else usageError 'not enough arguments'
 
 # show usage info (implicit)
-else
-	help()
+else usageError 'no input specified'
 	

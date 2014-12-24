@@ -1,21 +1,35 @@
 
 # TODO
-- [x] put archiveSize at the end
-- [x] add checksum
 - [ ] add verify command
-- [ ] ??? option to use short header keys (v, _, s, o, l) (expandHeaderKeys if header.v)
 - [ ] support symlinks
-- [x] extractFile
-- [x] extract
-- [x] rename args 'dest' to 'destDir' or 'destFilename'
-- [x] get rid of manual archive loading in tests
-- [x] tests api
-- [x] cli
+- [x] change cli args
+- [x] cli: fix extracting file
 - [ ] error handling
-- [ ] tests cli
+- [ ] test error handling
+- [x] tests cli
+- [ ] test -ls
 - [ ] ? removeFile
 - [ ] ? removeDirectory
+- [ ] adding files to existing archive aka rewriting
 - [ ] readme
-- [ ] put crawlFilesystem in exports or as separate npm module
-- [x] bug: something is creating dri1 and dir2 in root-dir during tests
+- [ ] option to use terminal colors
 - [ ] 
+
+# MAYBE's
+- [ ] put crawlFilesystem in exports or as separate npm module
+- [ ] option to use short header keys (v, _, s, o, l) (expandHeaderKeys if header.v)
+- [ ] 
+
+
+class AsarArchiveFileReadStream extends stream.Transform
+	constructor: (opts) ->
+		#unless @ instanceOf AsarArchiveFileReadStream
+		#	return new AsarArchiveFileReadStream opts
+
+		#Transform.call @, opts
+		super opts
+
+	_transform: (chunk, enc, cb) ->
+		buffer = if Buffer.isBuffer chunk then chunk else new Buffer chunk, enc
+		@push buffer
+		cb()

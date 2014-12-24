@@ -8,7 +8,7 @@ compDirs = require './util/compareDirectories'
 
 describe 'api', ->
 	it 'should create archive from directory', (done) ->
-		asar.createArchive 'test/input/packthis/', 'tmp/packthis-api.asar', (error) ->
+		asar.createArchive 'test/input/packthis/', 'tmp/packthis-api.asar', (err) ->
 			actual = fs.readFileSync 'tmp/packthis-api.asar', 'utf8'
 			expected = fs.readFileSync 'test/expected/packthis.asar', 'utf8'
 			return done assert.equal actual, expected
@@ -48,7 +48,7 @@ describe 'api', ->
 
 	it 'should extract a text file (to disk) from archive', ->
 		extractTo = 'tmp/extracted-api-file1.txt'
-		asar.extractFileFromArchive 'test/input/extractthis.asar', 'dir1/file1.txt', extractTo
+		asar.extractArchive 'test/input/extractthis.asar', extractTo, 'dir1/file1.txt'
 		actual = fs.readFileSync extractTo, 'utf8'
 		expected = fs.readFileSync 'test/expected/extractthis/dir1/file1.txt', 'utf8'
 		# on windows replace crlf with lf
@@ -57,7 +57,7 @@ describe 'api', ->
 
 	it 'should extract a binary file (to disk) from archive', ->
 		extractTo = 'tmp/extracted-api-file2.png'
-		asar.extractFileFromArchive 'test/input/extractthis.asar', 'dir2/file2.png', extractTo
+		asar.extractArchive 'test/input/extractthis.asar', extractTo, 'dir2/file2.png'
 		actual = fs.readFileSync extractTo, 'utf8'
 		expected = fs.readFileSync 'test/expected/extractthis/dir2/file2.png', 'utf8'
 		return assert.equal actual, expected
@@ -70,7 +70,7 @@ describe 'api', ->
 
 	it 'should extract a directory from archive', (done) ->
 		extractTo = 'tmp/extractthis-dir2-api/'
-		asar.extractDirectoryFromArchive 'test/input/extractthis.asar', 'dir2', extractTo
+		asar.extractArchive 'test/input/extractthis.asar', extractTo, 'dir2'
 		compDirs extractTo, 'test/expected/extractthis-dir2', done
 		return
 
@@ -112,7 +112,7 @@ describe 'api (old format, read-only)', ->
 
 	it 'should extract a text file (to disk) from archive', ->
 		extractTo = 'tmp/extracted-api-file1.txt'
-		asar.extractFileFromArchive 'test/input/extractthis-oldformat.asar', 'dir1/file1.txt', extractTo
+		asar.extractArchive 'test/input/extractthis-oldformat.asar', extractTo, 'dir1/file1.txt'
 		actual = fs.readFileSync extractTo, 'utf8'
 		expected = fs.readFileSync 'test/expected/extractthis/dir1/file1.txt', 'utf8'
 		# on windows replace crlf with lf
@@ -121,7 +121,7 @@ describe 'api (old format, read-only)', ->
 
 	it 'should extract a binary file (to disk) from archive', ->
 		extractTo = 'tmp/extracted-api-file2.png'
-		asar.extractFileFromArchive 'test/input/extractthis-oldformat.asar', 'dir2/file2.png', extractTo
+		asar.extractArchive 'test/input/extractthis-oldformat.asar', extractTo, 'dir2/file2.png'
 		actual = fs.readFileSync extractTo, 'utf8'
 		expected = fs.readFileSync 'test/expected/extractthis/dir2/file2.png', 'utf8'
 		return assert.equal actual, expected
@@ -134,7 +134,7 @@ describe 'api (old format, read-only)', ->
 
 	it 'should extract a directory from archive', (done) ->
 		extractTo = 'tmp/extractthis-dir2-api/'
-		asar.extractDirectoryFromArchive 'test/input/extractthis-oldformat.asar', 'dir2', extractTo
+		asar.extractArchive 'test/input/extractthis-oldformat.asar', extractTo, 'dir2'
 		compDirs extractTo, 'test/expected/extractthis-dir2', done
 		return
 
