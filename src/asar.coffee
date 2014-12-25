@@ -1,11 +1,13 @@
 
 AsarArchive = require './archive'
 
+opts = {}
+
 # create an archive
 # if srcDir is set: add dirs/files from srcDir
 # if archiveFilename is set: write archive to disk
 createArchive = (srcDir, archiveFilename, cb) ->
-	archive = new AsarArchive()
+	archive = new AsarArchive opts
 	if srcDir?
 		archive.addDirectory srcDir, srcDir, (err) ->
 			if archiveFilename?
@@ -15,7 +17,7 @@ createArchive = (srcDir, archiveFilename, cb) ->
 
 # load an archive from disk
 loadArchive = (archiveFilename) ->
-	archive = new AsarArchive()
+	archive = new AsarArchive opts
 	archive.openSync archiveFilename
 	return archive
 
@@ -37,4 +39,5 @@ module.exports = {
 	loadArchive
 	getEntries
 	extractArchive
+	opts
 }

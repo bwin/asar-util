@@ -7,6 +7,8 @@ exec = require('child_process').exec
 asar = require '../lib/asar'
 compDirs = require './util/compareDirectories'
 
+#asar.opts.verbose = yes
+
 describe 'cli', ->
 
 	it 'should list files/dirs in archive', (done) ->
@@ -34,9 +36,10 @@ describe 'cli', ->
 		return
 
 	it 'should extract a text file (to disk) from archive', (done) ->
-		extractTo = 'tmp/extracted-api-file1.txt'
+		extractTo = 'tmp/extracted-cli'
+		extractedFilename = path.join extractTo, 'file1.txt'
 		exec "node bin/asar-util -i test/input/extractthis.asar -o #{extractTo} -r dir1/file1.txt", (err, stdout, stderr) ->
-			actual = fs.readFileSync extractTo, 'utf8'
+			actual = fs.readFileSync extractedFilename, 'utf8'
 			expected = fs.readFileSync 'test/expected/extractthis/dir1/file1.txt', 'utf8'
 			# on windows replace crlf with lf
 			expected = expected.replace(/\r\n/g, '\n') if os.platform() is 'win32'
@@ -45,9 +48,10 @@ describe 'cli', ->
 		return
 
 	it 'should extract a binary file (to disk) from archive', (done) ->
-		extractTo = 'tmp/extracted-api-file2.png'
+		extractTo = 'tmp/extracted-cli'
+		extractedFilename = path.join extractTo, 'file2.png'
 		exec "node bin/asar-util -i test/input/extractthis.asar -o #{extractTo} -r dir2/file2.png", (err, stdout, stderr) ->
-			actual = fs.readFileSync extractTo, 'utf8'
+			actual = fs.readFileSync extractedFilename, 'utf8'
 			expected = fs.readFileSync 'test/expected/extractthis/dir2/file2.png', 'utf8'
 			done assert.equal actual, expected
 			return
@@ -96,9 +100,10 @@ describe 'cli (old format, read-only)', ->
 		return
 
 	it 'should extract a text file (to disk) from archive', (done) ->
-		extractTo = 'tmp/extracted-api-file1.txt'
+		extractTo = 'tmp/extracted-cli-old'
+		extractedFilename = path.join extractTo, 'file1.txt'
 		exec "node bin/asar-util -i test/input/extractthis-oldformat.asar -o #{extractTo} -r dir1/file1.txt", (err, stdout, stderr) ->
-			actual = fs.readFileSync extractTo, 'utf8'
+			actual = fs.readFileSync extractedFilename, 'utf8'
 			expected = fs.readFileSync 'test/expected/extractthis/dir1/file1.txt', 'utf8'
 			# on windows replace crlf with lf
 			expected = expected.replace(/\r\n/g, '\n') if os.platform() is 'win32'
@@ -107,23 +112,24 @@ describe 'cli (old format, read-only)', ->
 		return
 
 	it 'should extract a binary file (to disk) from archive', (done) ->
-		extractTo = 'tmp/extracted-api-file2.png'
+		extractTo = 'tmp/extracted-cli-old'
+		extractedFilename = path.join extractTo, 'file2.png'
 		exec "node bin/asar-util -i test/input/extractthis-oldformat.asar -o #{extractTo} -r dir2/file2.png", (err, stdout, stderr) ->
-			actual = fs.readFileSync extractTo, 'utf8'
+			actual = fs.readFileSync extractedFilename, 'utf8'
 			expected = fs.readFileSync 'test/expected/extractthis/dir2/file2.png', 'utf8'
 			done assert.equal actual, expected
 			return
 		return
 
 	it 'should extract an archive', (done) ->
-		extractTo = 'tmp/extractthis-api/'
+		extractTo = 'tmp/extractthis-cli-old'
 		exec "node bin/asar-util -i test/input/extractthis-oldformat.asar -o #{extractTo}", (err, stdout, stderr) ->
 			compDirs extractTo, 'test/expected/extractthis', done
 			return
 		return
 
 	it 'should extract a directory from archive', (done) ->
-		extractTo = 'tmp/extractthis-dir2-api/'
+		extractTo = 'tmp/extractthis-dir2-cli-old'
 		exec "node bin/asar-util -i test/input/extractthis-oldformat.asar -o #{extractTo} -r dir2", (err, stdout, stderr) ->
 			compDirs extractTo, 'test/expected/extractthis-dir2', done
 			return

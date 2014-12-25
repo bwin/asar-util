@@ -9,8 +9,8 @@ asar = require './asar'
 pkg = require '../package'
 
 argv = minimist process.argv.slice(2),
-	string: ['_'] # i in o out a add r root
-	boolean: 'h help v version w l list s verify verbose q quiet'.split ' '
+	string: '_ i in o out a add r root'.split ' '
+	boolean: 'h help v version w l list s verify c colors C compat verbose Q q quiet'.split ' '
 	default:
 		root: '/'
 
@@ -32,7 +32,9 @@ Options:
 -l, --list          list archive entries
 -s, --size          also list size
     --verify        verify archive integrity
-    --verbose       more feedback
+-c, --colors		use terminal colors for output
+-C, --compat        also read legacy asar format
+-Q, --verbose       more feedback
 -q, --quiet         no feedback
 Examples:
 create archive from dir:            asar-util dir archive
@@ -47,26 +49,49 @@ list archive entries with size:     asar-util archive -ls
 	"""
 
 usageError = (msg) ->
-	console.error "usage error: #{msg}#{os.EOL}"
+	console.error "usage error: #{msg}#{os.EOL}".error
 	help()
-	process.exit 1
+	process.exit -1
 
 generalError = (msg) ->
-	console.error "#{msg}#{os.EOL}"
+	console.error "#{msg}#{os.EOL}".error
 	process.exit 1
+
+done = ->
+	console.log "ok.".success
+	process.exit 0
 
 showHelp = argv.help or argv.h
 showVersion = argv.version or argv.v
 input = argv.i or argv.in or argv._[0]
 output = argv.o or argv.out or argv._[1]
 root = argv.r or argv.root
+doOverwrite = argv.w or argv.overwrite
 showList = argv.l or argv.list
 showListSize = argv.s or argv.size
 verify = argv.verify
-verbose = argv.verbose
+useColors = argv.c or argv.colors
+compatibilityMode = argv.C or argv.compat
+verbose = argv.Q or argv.verbose
 quiet = argv.q or argv.quiet
 
-#[input, output] = argv._
+
+if useColors
+	require 'terminal-colors' 
+	String::__defineGetter__ 'error', -> @.red
+	String::__defineGetter__ 'warning', -> @.yellow
+	String::__defineGetter__ 'info', -> @.cyan
+	String::__defineGetter__ 'success', -> @.green
+else
+	String::__defineGetter__ 'error', -> '' + @
+	String::__defineGetter__ 'warning', -> '' + @
+	String::__defineGetter__ 'info', -> '' + @
+	String::__defineGetter__ 'success', -> '' + @
+
+
+if verbose
+	asar.opts.verbose = yes
+	usageError 'Y U mix --verbose and --quiet ?! U crazy' if quiet
 
 # show usage info (explicit)
 if showHelp
@@ -81,7 +106,7 @@ else if input
 	if showList
 		usageError 'output and --list not allowed together' if output
 		usageError 'output and --verify not allowed together' if verify
-		usageError 'Y U MIX --list and --quiet ?! makes no sense' if quiet
+		usageError 'Y U mix --list and --quiet ?! makes no sense' if quiet
 		console.log "listing #{input}:#{root}" if verbose
 		if showListSize
 			# list archive content with size
@@ -103,16 +128,20 @@ else if input
 			catch err
 				generalError err.message
 			console.log entries.join os.EOL
+		done()
 
 	else if showListSize then usageError '--size can only be used with --list'
 
 	else if output
 		# transcode in -> out
-		inputStat = fs.lstatSync input
+		try
+			inputStat = fs.lstatSync input
+		catch err
+			generalError "input not found: #{input}"
 
 		if inputStat.isDirectory()
 			# create archive
-			console.log "packing #{input} to #{output}" if verbose
+			console.log "packing #{input.info} to #{output.info}" if verbose
 			try
 				asar.createArchive input, output, (err) ->
 					generalError err.message if err
@@ -120,11 +149,12 @@ else if input
 				generalError err.message
 		else
 			# extract archive
-			console.log "extracting #{input}:#{root} to #{output}" if verbose
+			console.log "extracting #{(input + root).info} to #{output.info}" if verbose
 			try
 				asar.extractArchive input, output, root
 			catch err
 				generalError err.message
+		done()
 
 	# input but nothing else
 	else usageError 'not enough arguments'

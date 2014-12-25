@@ -6,6 +6,8 @@ os = require 'os'
 asar = require '../lib/asar'
 compDirs = require './util/compareDirectories'
 
+#asar.opts.verbose = yes
+
 describe 'api', ->
 	it 'should create archive from directory', (done) ->
 		asar.createArchive 'test/input/packthis/', 'tmp/packthis-api.asar', (err) ->
@@ -47,18 +49,20 @@ describe 'api', ->
 		return assert.equal actual, expected
 
 	it 'should extract a text file (to disk) from archive', ->
-		extractTo = 'tmp/extracted-api-file1.txt'
+		extractTo = 'tmp/extracted-api'
+		extractedFilename = path.join extractTo, 'file1.txt'
 		asar.extractArchive 'test/input/extractthis.asar', extractTo, 'dir1/file1.txt'
-		actual = fs.readFileSync extractTo, 'utf8'
+		actual = fs.readFileSync extractedFilename, 'utf8'
 		expected = fs.readFileSync 'test/expected/extractthis/dir1/file1.txt', 'utf8'
 		# on windows replace crlf with lf
 		expected = expected.replace(/\r\n/g, '\n') if os.platform() is 'win32'
 		return assert.equal actual, expected
 
 	it 'should extract a binary file (to disk) from archive', ->
-		extractTo = 'tmp/extracted-api-file2.png'
+		extractTo = 'tmp/extracted-api'
+		extractedFilename = path.join extractTo, 'file2.png'
 		asar.extractArchive 'test/input/extractthis.asar', extractTo, 'dir2/file2.png'
-		actual = fs.readFileSync extractTo, 'utf8'
+		actual = fs.readFileSync extractedFilename, 'utf8'
 		expected = fs.readFileSync 'test/expected/extractthis/dir2/file2.png', 'utf8'
 		return assert.equal actual, expected
 
@@ -111,29 +115,31 @@ describe 'api (old format, read-only)', ->
 		return assert.equal actual, expected
 
 	it 'should extract a text file (to disk) from archive', ->
-		extractTo = 'tmp/extracted-api-file1.txt'
+		extractTo = 'tmp/extracted-api-old'
+		extractedFilename = path.join extractTo, 'file1.txt'
 		asar.extractArchive 'test/input/extractthis-oldformat.asar', extractTo, 'dir1/file1.txt'
-		actual = fs.readFileSync extractTo, 'utf8'
+		actual = fs.readFileSync extractedFilename, 'utf8'
 		expected = fs.readFileSync 'test/expected/extractthis/dir1/file1.txt', 'utf8'
 		# on windows replace crlf with lf
 		expected = expected.replace(/\r\n/g, '\n') if os.platform() is 'win32'
 		return assert.equal actual, expected
 
 	it 'should extract a binary file (to disk) from archive', ->
-		extractTo = 'tmp/extracted-api-file2.png'
+		extractTo = 'tmp/extracted-api-old'
+		extractedFilename = path.join extractTo, 'file2.png'
 		asar.extractArchive 'test/input/extractthis-oldformat.asar', extractTo, 'dir2/file2.png'
-		actual = fs.readFileSync extractTo, 'utf8'
+		actual = fs.readFileSync extractedFilename, 'utf8'
 		expected = fs.readFileSync 'test/expected/extractthis/dir2/file2.png', 'utf8'
 		return assert.equal actual, expected
 
 	it 'should extract an archive', (done) ->
-		extractTo = 'tmp/extractthis-api/'
+		extractTo = 'tmp/extractthis-api-old'
 		asar.extractArchive 'test/input/extractthis-oldformat.asar', extractTo
 		compDirs extractTo, 'test/expected/extractthis', done
 		return
 
 	it 'should extract a directory from archive', (done) ->
-		extractTo = 'tmp/extractthis-dir2-api/'
+		extractTo = 'tmp/extractthis-dir2-api-old'
 		asar.extractArchive 'test/input/extractthis-oldformat.asar', extractTo, 'dir2'
 		compDirs extractTo, 'test/expected/extractthis-dir2', done
 		return

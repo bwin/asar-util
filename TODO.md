@@ -2,17 +2,16 @@
 # TODO
 - [ ] add verify command
 - [ ] support symlinks
-- [x] change cli args
-- [x] cli: fix extracting file
+- [ ] default:dont-overwrite, honor --overwrite flag
+- [ ] honor --compat
+- [ ] test -ls
 - [ ] error handling
 - [ ] test error handling
-- [x] tests cli
-- [ ] test -ls
 - [ ] ? removeFile
 - [ ] ? removeDirectory
 - [ ] adding files to existing archive aka rewriting
 - [ ] readme
-- [ ] option to use terminal colors
+- [ ] dev-dep:asar & test performance against it on our node_modules and node_modules/coffee-script
 - [ ] 
 
 # MAYBE's

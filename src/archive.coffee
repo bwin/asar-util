@@ -26,7 +26,7 @@ crawlFilesystem = (dir, cb) ->
 	return
 
 module.exports = class AsarArchive
-	constructor: ->
+	constructor: (@opts) ->
 		@reset()
 		return
 
@@ -238,11 +238,11 @@ module.exports = class AsarArchive
 	# !!! ...
 	extractSync: (dest, archiveRoot='/') ->
 		filenames = @getEntries archiveRoot
-		relativeTo = archiveRoot
 		if filenames.length is 1
 			archiveRoot = path.dirname archiveRoot
 		else
 			mkdirp.sync dest # create destination directory
+		relativeTo = archiveRoot
 		relativeTo = relativeTo.substr 1 if relativeTo[0] in '/\\'.split ''
 		relativeTo = relativeTo[...-1] if relativeTo[-1..] in '/\\'.split ''
 
@@ -252,9 +252,10 @@ module.exports = class AsarArchive
 			destFilename = destFilename.replace relativeTo, '' if relativeTo isnt '.'
 			destFilename = path.join dest, destFilename
 			#dbg console.log "filename=#{filename} relativeTo=#{relativeTo} archiveRoot=#{archiveRoot} destFilename=#{destFilename}"
+			console.log "#{filename} -> #{destFilename}" if @opts.verbose
 			node = @_searchNode filename, no
 			if node.files
-				# it's a directory, create it and continue with the next entry
+				# it's a directory, create it
 				mkdirp.sync destFilename
 			else
 				# it's a file, extract it
@@ -301,6 +302,7 @@ module.exports = class AsarArchive
 	addDirectory: (dirname, relativeTo, cb) ->
 		crawlFilesystem dirname, (err, files) =>
 			for file in files
+				console.log "+ #{path.sep}#{path.relative relativeTo, file.name}" if @opts.verbose
 				if file.stat.isDirectory()
 					@createDirectory path.relative relativeTo, file.name
 				else if file.stat.isFile()
