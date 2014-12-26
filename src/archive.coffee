@@ -127,20 +127,19 @@ module.exports = class AsarArchive
 
 	_writeFooter: (out, cb) ->
 		archiveFile = fs.createReadStream @_archiveName
-		archiveFile.on 'readable', =>
-			md5 = crypto.createHash('md5')
-			archiveFile.pipe md5
-			md5.on 'readable', =>
-				@_checksum = md5.read()
-				@_archiveSize = 8 + @_headerSize + @_offset + 16 + 4  
-				if @_archiveSize > 4294967295 # because of js precision limit
-					return cb new Error "archive size can not be larger than 4.2GB"
-				sizeBuf = new Buffer 4
-				sizeBuf.writeUInt32LE @_archiveSize, 0
+		md5 = crypto.createHash('md5')
+		archiveFile.pipe md5
+		archiveFile.on 'end', =>
+			# is this really ok ???
+			@_checksum = md5.read()
+			@_archiveSize = 8 + @_headerSize + @_offset + 16 + 4  
+			if @_archiveSize > 4294967295 # because of js precision limit
+				return cb new Error "archive size can not be larger than 4.2GB"
+			sizeBuf = new Buffer 4
+			sizeBuf.writeUInt32LE @_archiveSize, 0
 
-				out.write @_checksum, ->
-					out.write sizeBuf, cb
-					return
+			out.write @_checksum, ->
+				out.write sizeBuf, cb
 				return
 			return
 		return

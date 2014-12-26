@@ -11,7 +11,7 @@
 - [ ] ? removeDirectory
 - [ ] adding files to existing archive aka rewriting
 - [ ] readme
-- [ ] dev-dep:asar & test performance against it on our node_modules and node_modules/coffee-script
+- [ ] dev-dep:asar & test performance against it on our node_modules and just node_modules/coffee-script
 - [ ] 
 
 # MAYBE's
