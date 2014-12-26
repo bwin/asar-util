@@ -128,7 +128,7 @@ else if input
 			catch err
 				generalError err.message
 			console.log entries.join os.EOL
-		done()
+		#done()
 
 	else if showListSize then usageError '--size can only be used with --list'
 

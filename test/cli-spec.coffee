@@ -26,7 +26,8 @@ describe 'cli', ->
 			# on windows replace slashes with backslashes and crlf with lf
 			if os.platform() is 'win32'
 				#expected = expected.replace(/\//g, '\\').replace(/\r\n/g, '\n')
-				expected = expected.replace(/\//g, '\\') + '\n'
+				expected = expected.replace(/\//g, '\\')
+			expected += '\n'
 			done assert.equal actual, expected
 			return
 		return
@@ -38,7 +39,8 @@ describe 'cli', ->
 			# on windows replace slashes with backslashes and crlf with lf
 			if os.platform() is 'win32'
 				#expected = expected.replace(/\//g, '\\').replace(/\r\n/g, '\n')
-				expected = expected.replace(/\//g, '\\') + '\n'
+				expected = expected.replace(/\//g, '\\')
+			expected += '\n'
 			done assert.equal actual, expected
 			return
 		return
@@ -90,7 +92,8 @@ describe 'cli (old format, read-only)', ->
 			# on windows replace slashes with backslashes and crlf with lf
 			if os.platform() is 'win32'
 				#expected = expected.replace(/\//g, '\\').replace(/\r\n/g, '\n')
-				expected = expected.replace(/\//g, '\\') + '\n'
+				expected = expected.replace(/\//g, '\\')
+			expected += '\n'
 			done assert.equal actual, expected
 			return
 		return
@@ -102,7 +105,8 @@ describe 'cli (old format, read-only)', ->
 			# on windows replace slashes with backslashes and crlf with lf
 			if os.platform() is 'win32'
 				#expected = expected.replace(/\//g, '\\').replace(/\r\n/g, '\n')
-				expected = expected.replace(/\//g, '\\') + '\n'
+				expected = expected.replace(/\//g, '\\')
+			expected += '\n'
 			done assert.equal actual, expected
 			return
 		return
