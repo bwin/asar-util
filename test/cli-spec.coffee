@@ -11,6 +11,14 @@ compDirs = require './util/compareDirectories'
 
 describe 'cli', ->
 
+	it 'should create archive from directory', (done) ->
+		packTo = 'tmp/packthis-cli.asar'
+		exec "node bin/asar-util -i test/input/packthis/ -o #{packTo}", (err, stdout, stderr) ->
+			actual = fs.readFileSync packTo, 'utf8'
+			expected = fs.readFileSync 'test/expected/packthis.asar', 'utf8'
+			return done assert.equal actual, expected
+		return
+
 	it 'should list files/dirs in archive', (done) ->
 		exec "node bin/asar-util -i test/input/extractthis.asar -l", (err, stdout, stderr) ->
 			actual = stdout

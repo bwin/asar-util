@@ -145,6 +145,7 @@ else if input
 			try
 				asar.createArchive input, output, (err) ->
 					generalError err.message if err
+					return done()
 			catch err
 				generalError err.message
 		else
@@ -152,9 +153,9 @@ else if input
 			console.log "extracting #{(input + root).info} to #{output.info}" if verbose
 			try
 				asar.extractArchive input, output, root
+				done()
 			catch err
 				generalError err.message
-		done()
 
 	# input but nothing else
 	else usageError 'not enough arguments'
