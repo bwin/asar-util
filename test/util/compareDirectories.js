@@ -1,7 +1,11 @@
+
 fs = require('fs');
 path = require('path');
+
 walkdir = require('walkdir');
 _ = require('lodash');
+streamEqual = require('stream-equal');
+queue = require('queue-async');
 
 var crawlFilesystem = function(dir, cb) {
   var paths = [];
@@ -43,44 +47,57 @@ module.exports = function(dirA, dirB, cb) {
       var isIdentical;
       var errorMsg = '\n';
 
-      for (i in inBoth) {
+      compareFiles = function (i, cb) {
         filename = inBoth[i];
         typeA = metadataA[filename].type;
         typeB = metadataB[filename].type;
         // skip if both are directories
         if('directory' === typeA && 'directory' === typeB)
-          continue;
+          return cb();
         // something is wrong if one entry is a file and the other is a directory
         // (do a XOR with the ternary operator)
         if('directory' === typeA ? 'directory' !== typeB : 'directory' === typeB) {
           differentFiles.push(filename);
-          continue;
+          return cb();
         }
-        fileContentA = fs.readFileSync(path.join(dirA, filename), 'utf8');
-        fileContentB = fs.readFileSync(path.join(dirB, filename), 'utf8');
-        if(fileContentA !== fileContentB)
-          differentFiles.push(filename);
-      }
+        //fileContentA = fs.readFileSync(path.join(dirA, filename), 'utf8');
+        //fileContentB = fs.readFileSync(path.join(dirB, filename), 'utf8');
+        //if(fileContentA !== fileContentB)
+        //  differentFiles.push(filename);
+        streamA = fs.createReadStream(path.join(dirA, filename));
+        streamB = fs.createReadStream(path.join(dirB, filename));
+        streamEqual(streamA, streamB, function(err, equal) {
+          if (!equal)
+            differentFiles.push(filename);
+          cb();
+        });
+      };
 
-      if (onlyInA.length) {
-        errorMsg += '\tEntries only in "' + dirA + '":\n';
-        for (i in onlyInA)
-          errorMsg += '\t  ' + onlyInA[i] + '\n';
-      }
-      if (onlyInB.length) {
-        errorMsg += '\tEntries only in "' + dirB + '"\n';
-        for (i in onlyInB)
-          errorMsg += '\t  ' + onlyInB[i] + '\n';
-      }
-      if (differentFiles.length) {
-        errorMsg += '\tDifferent file content:\n';
-        for (i in differentFiles)
-          errorMsg += '\t  ' + differentFiles[i] + '\n';
-      }
+      q = queue(1);
+      for (i in inBoth)
+        q.defer(compareFiles, i);
+      
+      q.awaitAll(function(err) {
+        if (onlyInA.length) {
+          errorMsg += '\tEntries only in "' + dirA + '":\n';
+          for (i in onlyInA)
+            errorMsg += '\t  ' + onlyInA[i] + '\n';
+        }
+        if (onlyInB.length) {
+          errorMsg += '\tEntries only in "' + dirB + '"\n';
+          for (i in onlyInB)
+            errorMsg += '\t  ' + onlyInB[i] + '\n';
+        }
+        if (differentFiles.length) {
+          errorMsg += '\tDifferent file content:\n';
+          for (i in differentFiles)
+            errorMsg += '\t  ' + differentFiles[i] + '\n';
+        }
 
-      isIdentical = !onlyInA.length && !onlyInB.length && !differentFiles.length;
+        isIdentical = !onlyInA.length && !onlyInB.length && !differentFiles.length;
 
-      cb(isIdentical ? null : new Error(errorMsg));
+        cb(isIdentical ? null : new Error(errorMsg));
+      });
     });
   });
 }
