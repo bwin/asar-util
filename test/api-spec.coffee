@@ -9,6 +9,8 @@ compDirs = require './util/compareDirectories'
 #asar.opts.verbose = yes
 
 describe 'api:', ->
+	@timeout 1000*60 * 1 # minutes
+
 	it 'should create archive from directory', (done) ->
 		asar.createArchive 'test/input/packthis/', 'tmp/packthis-api.asar', (err) ->
 			actual = fs.readFileSync 'tmp/packthis-api.asar', 'utf8'
@@ -117,6 +119,7 @@ describe 'api:', ->
 	return
 
 describe 'api (old format, read-only):', ->
+	@timeout 1000*60 * 1 # minutes
 
 	it 'should list files/dirs in archive', ->
 		archive = asar.loadArchive 'test/input/extractthis-oldformat.asar'

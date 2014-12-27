@@ -10,6 +10,7 @@ compDirs = require './util/compareDirectories'
 #asar.opts.verbose = yes
 
 describe 'cli:', ->
+	@timeout 1000*60 * 1 # minutes
 
 	it 'should create archive from directory', (done) ->
 		packTo = 'tmp/packthis-cli.asar'
@@ -114,6 +115,7 @@ describe 'cli:', ->
 	return
 
 describe 'cli (old format, read-only):', ->
+	@timeout 1000*60 * 1 # minutes
 
 	it 'should list files/dirs in archive', (done) ->
 		exec "node bin/asar-util -i test/input/extractthis-oldformat.asar -l", (err, stdout, stderr) ->
