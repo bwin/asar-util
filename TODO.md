@@ -1,5 +1,6 @@
 
 # TODO
+- [ ] original asar: test (and fix) extracting empty files
 - [ ] add verify command
 - [ ] support symlinks
 - [ ] default:dont-overwrite, honor --overwrite flag

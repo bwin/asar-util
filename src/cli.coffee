@@ -35,6 +35,7 @@ Options:
 -c, --colors		use terminal colors for output
 -C, --compat        also read legacy asar format
 -Q, --verbose       more feedback
+    --debug         a lot feedback
 -q, --quiet         no feedback
 Examples:
 create archive from dir:            asar-util dir archive
@@ -73,6 +74,7 @@ verify = argv.verify
 useColors = argv.c or argv.colors
 compatibilityMode = argv.C or argv.compat
 verbose = argv.Q or argv.verbose
+debug = argv.debug
 quiet = argv.q or argv.quiet
 
 
@@ -92,6 +94,9 @@ else
 if verbose
 	asar.opts.verbose = yes
 	usageError 'Y U mix --verbose and --quiet ?! U crazy' if quiet
+if debug
+	asar.opts.debug = yes
+	usageError 'Y U mix --debug and --quiet ?! U crazy' if quiet
 
 # show usage info (explicit)
 if showHelp
@@ -119,7 +124,7 @@ else if input
 				metadata = archive.getMetadata entry
 				line = entry
 				line += path.sep if metadata.files?
-				line += "\t#{metadata.size}" if metadata.size
+				line += "\t#{metadata.size}" if metadata.size?
 				console.log line
 		else
 			# list archive content

@@ -80,6 +80,26 @@ describe 'cli', ->
 			compDirs extractTo, 'test/expected/extractthis-dir2', done
 			return
 		return
+
+	describe 'archive node_modules', ->
+		src =  'node_modules/'
+		archiveFilename = 'tmp/modules-cli.asar'
+		extractTo = 'tmp/modules-cli/'
+
+		it 'create it', (done) ->
+			exec "node bin/asar-util -i #{src} -o #{archiveFilename}", (err, stdout, stderr) ->
+				return done err
+			return
+
+		it 'extract it', (done) ->
+			exec "node bin/asar-util -i #{archiveFilename} -o #{extractTo}", (err, stdout, stderr) ->
+				return done err
+			return
+
+		it 'compare', (done) ->
+			compDirs extractTo, src, done
+			return
+		return
 		
 	return
 

@@ -101,14 +101,23 @@ module.exports = class AsarArchive
 			throw new Error 'Unable to read header size (assumed old format)'
 		size = sizeBuf.readUInt32LE 4
 
+		#if fs.readSync(fd, sizeBuf, 0, sizeBufSize, 8) isnt sizeBufSize
+		#	throw new Error 'Unable to read header something between size and json-header (assumed old format)'
+		#console.log "s=", size
+		#console.log "s1=", sizeBuf.readUInt32LE 0
+		#console.log "s2=", sizeBuf.readUInt32LE 4
+
 		actualSize = size - 8
 		headerBuf = new Buffer actualSize
 		if fs.readSync(fd, headerBuf, 0, actualSize, 16) isnt actualSize
 			throw new Error 'Unable to read header (assumed old format)'
 
 		try
-			@_header = JSON.parse headerBuf
+			# remove trailing 0's (because of padding that can occur?)
+			headerStr = headerBuf.toString().replace /\0+$/g, ''
+			@_header = JSON.parse headerStr
 		catch err
+			console.log "header:'#{x}'",err
 			throw new Error 'Unable to parse header (assumed old format)'
 		@_headerSize = size
 		return
@@ -223,6 +232,7 @@ module.exports = class AsarArchive
 	getFile: (filename) ->
 		fd = fs.openSync @_archiveName, 'r'
 		node = @_searchNode filename, no
+		return '' unless node.size > 0
 		buffer = new Buffer node.size
 		fs.readSync fd, buffer, 0, node.size, 8 + @_headerSize + parseInt node.offset, 10
 		fs.closeSync fd

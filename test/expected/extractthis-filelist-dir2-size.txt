@@ -1,0 +1,4 @@
+/dir2/dir3/
+/dir2/dir3/emtpy-file.txt	0
+/dir2/file2.png	182
+/dir2/file3.txt	3

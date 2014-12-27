@@ -78,6 +78,29 @@ describe 'api', ->
 		compDirs extractTo, 'test/expected/extractthis-dir2', done
 		return
 
+	describe 'archive node_modules', ->
+		src =  'node_modules/'
+		archiveFilename = 'tmp/modules-api.asar'
+		extractTo = 'tmp/modules-api/'
+
+		it 'create it', (done) ->
+			asar.createArchive src, archiveFilename, (err) ->
+				return done err
+			return
+
+		it 'extract it', (done) ->
+			try
+				asar.extractArchive archiveFilename, extractTo
+			catch err
+				return done err
+			done()
+			return
+
+		it 'compare', (done) ->
+			compDirs extractTo, src, done
+			return
+		return
+
 	return
 
 describe 'api (old format, read-only)', ->
