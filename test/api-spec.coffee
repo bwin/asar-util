@@ -8,7 +8,7 @@ compDirs = require './util/compareDirectories'
 
 #asar.opts.verbose = yes
 
-describe 'api', ->
+describe 'api:', ->
 	it 'should create archive from directory', (done) ->
 		asar.createArchive 'test/input/packthis/', 'tmp/packthis-api.asar', (err) ->
 			actual = fs.readFileSync 'tmp/packthis-api.asar', 'utf8'
@@ -78,8 +78,8 @@ describe 'api', ->
 		compDirs extractTo, 'test/expected/extractthis-dir2', done
 		return
 
-	describe 'archive node_modules', ->
-		src =  'node_modules/'
+	describe 'archive node_modules:', ->
+		src = 'node_modules/'
 		archiveFilename = 'tmp/modules-api.asar'
 		extractTo = 'tmp/modules-api/'
 
@@ -96,14 +96,27 @@ describe 'api', ->
 			done()
 			return
 
-		it 'compare', (done) ->
+		it 'compare it', (done) ->
 			compDirs extractTo, src, done
 			return
+
+		it 'extract coffee-script', (done) ->
+			try
+				asar.extractArchive archiveFilename, 'tmp/coffee-script-api/', 'coffee-script/'
+			catch err
+				return done err
+			done()
+			return
+
+		it 'compare coffee-script', (done) ->
+			compDirs 'tmp/coffee-script-api/', 'node_modules/coffee-script/', done
+			return
+
 		return
 
 	return
 
-describe 'api (old format, read-only)', ->
+describe 'api (old format, read-only):', ->
 
 	it 'should list files/dirs in archive', ->
 		archive = asar.loadArchive 'test/input/extractthis-oldformat.asar'

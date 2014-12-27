@@ -9,7 +9,7 @@ compDirs = require './util/compareDirectories'
 
 #asar.opts.verbose = yes
 
-describe 'cli', ->
+describe 'cli:', ->
 
 	it 'should create archive from directory', (done) ->
 		packTo = 'tmp/packthis-cli.asar'
@@ -81,7 +81,7 @@ describe 'cli', ->
 			return
 		return
 
-	describe 'archive node_modules', ->
+	describe 'archive node_modules:', ->
 		src =  'node_modules/'
 		archiveFilename = 'tmp/modules-cli.asar'
 		extractTo = 'tmp/modules-cli/'
@@ -96,14 +96,24 @@ describe 'cli', ->
 				return done err
 			return
 
-		it 'compare', (done) ->
+		it 'compare it', (done) ->
 			compDirs extractTo, src, done
 			return
+		
+		it 'extract coffee-script', (done) ->
+			exec "node bin/asar-util -i #{archiveFilename} -o tmp/coffee-script-cli/ -r coffee-script", (err, stdout, stderr) ->
+				return done err
+			return
+
+		it 'compare coffee-script', (done) ->
+			compDirs 'tmp/coffee-script-cli/', 'node_modules/coffee-script/', done
+			return
+
 		return
 		
 	return
 
-describe 'cli (old format, read-only)', ->
+describe 'cli (old format, read-only):', ->
 
 	it 'should list files/dirs in archive', (done) ->
 		exec "node bin/asar-util -i test/input/extractthis-oldformat.asar -l", (err, stdout, stderr) ->
