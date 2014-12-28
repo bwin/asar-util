@@ -160,7 +160,7 @@ else if input
 			# extract archive
 			console.log "extracting #{(input + root + (pattern or '')).info} to #{output.info}" if verbose
 			try
-				asar.extractArchive input, output, root, pattern
+				asar.extractArchiveSync input, output, root, pattern
 				done()
 			catch err
 				generalError err.message

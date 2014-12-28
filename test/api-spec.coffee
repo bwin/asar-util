@@ -62,7 +62,7 @@ describe 'api:', ->
 	it 'should extract a text file (to disk) from archive', ->
 		extractTo = 'tmp/extracted-api'
 		extractedFilename = path.join extractTo, 'file1.txt'
-		asar.extractArchive 'test/input/extractthis.asar', extractTo, 'dir1/file1.txt'
+		asar.extractArchiveSync 'test/input/extractthis.asar', extractTo, 'dir1/file1.txt'
 		actual = fs.readFileSync extractedFilename, 'utf8'
 		expected = fs.readFileSync 'test/expected/extractthis/dir1/file1.txt', 'utf8'
 		# on windows replace crlf with lf
@@ -72,21 +72,33 @@ describe 'api:', ->
 	it 'should extract a binary file (to disk) from archive', ->
 		extractTo = 'tmp/extracted-api'
 		extractedFilename = path.join extractTo, 'file2.png'
-		asar.extractArchive 'test/input/extractthis.asar', extractTo, 'dir2/file2.png'
+		asar.extractArchiveSync 'test/input/extractthis.asar', extractTo, 'dir2/file2.png'
 		actual = fs.readFileSync extractedFilename, 'utf8'
 		expected = fs.readFileSync 'test/expected/extractthis/dir2/file2.png', 'utf8'
 		return assert.equal actual, expected
 
 	it 'should extract an archive', (done) ->
 		extractTo = 'tmp/extractthis-api/'
-		asar.extractArchive 'test/input/extractthis.asar', extractTo
+		asar.extractArchiveSync 'test/input/extractthis.asar', extractTo
 		compDirs extractTo, 'test/expected/extractthis', done
 		return
 
 	it 'should extract a directory from archive', (done) ->
 		extractTo = 'tmp/extractthis-dir2-api/'
-		asar.extractArchive 'test/input/extractthis.asar', extractTo, 'dir2'
+		asar.extractArchiveSync 'test/input/extractthis.asar', extractTo, 'dir2'
 		compDirs extractTo, 'test/expected/extractthis-dir2', done
+		return
+
+	it 'should extract an archive async', (done) ->
+		extractTo = 'tmp/extractthis-async-api/'
+		asar.extractArchive 'test/input/extractthis.asar', extractTo, (err) ->
+			compDirs extractTo, 'test/expected/extractthis', done
+		return
+
+	it 'should extract a directory from archive async', (done) ->
+		extractTo = 'tmp/extractthis-async-dir2-api/'
+		asar.extractArchive 'test/input/extractthis.asar', extractTo, root: 'dir2', (err) ->
+			compDirs extractTo, 'test/expected/extractthis-dir2', done
 		return
 
 	describe 'archive node_modules:', ->
@@ -101,7 +113,7 @@ describe 'api:', ->
 
 		it 'extract it', (done) ->
 			try
-				asar.extractArchive archiveFilename, extractTo
+				asar.extractArchiveSync archiveFilename, extractTo
 			catch err
 				return done err
 			done()
@@ -113,10 +125,33 @@ describe 'api:', ->
 
 		it 'extract coffee-script', (done) ->
 			try
-				asar.extractArchive archiveFilename, 'tmp/coffee-script-api/', 'coffee-script/'
+				asar.extractArchiveSync archiveFilename, 'tmp/coffee-script-api/', 'coffee-script/'
 			catch err
 				return done err
 			done()
+			return
+
+		it 'compare coffee-script', (done) ->
+			compDirs 'tmp/coffee-script-api/', 'node_modules/coffee-script/', done
+			return
+
+		return
+
+	describe 'archive node_modules (async extract):', ->
+		src = 'node_modules/'
+		archiveFilename = 'tmp/modules-api.asar'
+		extractTo = 'tmp/modules-api-async/'
+		
+		it 'extract it async', (done) ->
+			asar.extractArchive archiveFilename, extractTo, done
+			return
+
+		it 'compare it', (done) ->
+			compDirs extractTo, src, done
+			return
+
+		it 'extract coffee-script async', (done) ->
+			asar.extractArchive archiveFilename, 'tmp/coffee-script-api/', root: 'coffee-script/', done
 			return
 
 		it 'compare coffee-script', (done) ->
@@ -165,7 +200,7 @@ describe 'api (old format, read-only):', ->
 	it 'should extract a text file (to disk) from archive', ->
 		extractTo = 'tmp/extracted-api-old'
 		extractedFilename = path.join extractTo, 'file1.txt'
-		asar.extractArchive 'test/input/extractthis-oldformat.asar', extractTo, 'dir1/file1.txt'
+		asar.extractArchiveSync 'test/input/extractthis-oldformat.asar', extractTo, 'dir1/file1.txt'
 		actual = fs.readFileSync extractedFilename, 'utf8'
 		expected = fs.readFileSync 'test/expected/extractthis/dir1/file1.txt', 'utf8'
 		# on windows replace crlf with lf
@@ -175,20 +210,20 @@ describe 'api (old format, read-only):', ->
 	it 'should extract a binary file (to disk) from archive', ->
 		extractTo = 'tmp/extracted-api-old'
 		extractedFilename = path.join extractTo, 'file2.png'
-		asar.extractArchive 'test/input/extractthis-oldformat.asar', extractTo, 'dir2/file2.png'
+		asar.extractArchiveSync 'test/input/extractthis-oldformat.asar', extractTo, 'dir2/file2.png'
 		actual = fs.readFileSync extractedFilename, 'utf8'
 		expected = fs.readFileSync 'test/expected/extractthis/dir2/file2.png', 'utf8'
 		return assert.equal actual, expected
 
 	it 'should extract an archive', (done) ->
 		extractTo = 'tmp/extractthis-api-old'
-		asar.extractArchive 'test/input/extractthis-oldformat.asar', extractTo
+		asar.extractArchiveSync 'test/input/extractthis-oldformat.asar', extractTo
 		compDirs extractTo, 'test/expected/extractthis', done
 		return
 
 	it 'should extract a directory from archive', (done) ->
 		extractTo = 'tmp/extractthis-dir2-api-old'
-		asar.extractArchive 'test/input/extractthis-oldformat.asar', extractTo, 'dir2'
+		asar.extractArchiveSync 'test/input/extractthis-oldformat.asar', extractTo, 'dir2'
 		compDirs extractTo, 'test/expected/extractthis-dir2', done
 		return
 

@@ -2,6 +2,7 @@
 fs = require 'fs'
 path = require 'path'
 crypto = require 'crypto'
+stream = require 'stream'
 
 walkdir = require 'walkdir'
 minimatch = require 'minimatch'
@@ -13,12 +14,12 @@ sortBy = (prop) -> (a, b) ->
 	return 0
 
 module.exports = class AsarArchive
+	MAGIC: 'ASAR'
+	VERSION: 1
+
 	constructor: (@opts) ->
 		@reset()
 		return
-
-	MAGIC: 'ASAR'
-	VERSION: 1
 
 	reset: ->
 		@_header =
@@ -134,7 +135,7 @@ module.exports = class AsarArchive
 			@_checksum = md5.read()
 			@_archiveSize = 8 + @_headerSize + @_offset + 16 + 4  
 			if @_archiveSize > 4294967295 # because of js precision limit
-				return cb new Error "archive size can not be larger than 4.2GB"
+				return cb? new Error "archive size can not be larger than 4.2GB"
 			sizeBuf = new Buffer 4
 			sizeBuf.writeUInt32LE @_archiveSize, 0
 
@@ -159,7 +160,7 @@ module.exports = class AsarArchive
 				matchFn = minimatch.filter pattern, matchBase: yes
 				paths = paths.filter (a) ->	matchFn path.sep + path.relative dir, a.name
 			paths.sort sortBy 'name'
-			return cb null, paths
+			return cb? null, paths
 		walker.on 'error', cb
 		return
 
@@ -203,7 +204,7 @@ module.exports = class AsarArchive
 			for file in @_files
 				q.defer writeFile, file, out
 				q.awaitAll (err) =>
-					return cb err if err
+					return cb? err if err
 					@_writeFooter out, cb
 					
 			return
@@ -256,7 +257,63 @@ module.exports = class AsarArchive
 		mkdirp.sync path.dirname destFilename
 		fs.writeFileSync destFilename, @getFile filename
 		return yes
+
+	# !!! ...
+	createReadStream: (filename) ->
+		node = @_searchNode filename, no
+		if node.size > 0
+			start = 8 + @_headerSize + parseInt node.offset, 10
+			end = start + node.size - 1
+			return fs.createReadStream @_archiveName, start: start, end: end
+		else
+			emptyStream = stream.Readable()
+			emptyStream.push null
+			return emptyStream
 		
+	# !!! ...
+	extract: (dest, opts, cb) ->
+		# make opts optional
+		if typeof opts is 'function'
+			cb = opts
+			opts = {}
+		# init default opts
+		archiveRoot = opts.root or '/'
+		pattern = opts.pattern
+
+		filenames = @getEntries archiveRoot, pattern
+		if filenames.length is 1
+			archiveRoot = path.dirname archiveRoot
+		else
+			mkdirp.sync dest # create destination directory
+
+		relativeTo = archiveRoot
+		relativeTo = relativeTo.substr 1 if relativeTo[0] in '/\\'.split ''
+		relativeTo = relativeTo[...-1] if relativeTo[-1..] in '/\\'.split ''
+
+		writeStreamToFile = (inStream, destFilename, cb) ->
+			out = fs.createWriteStream destFilename
+			inStream.on 'end', cb
+			inStream.on 'error', cb
+			inStream.pipe out
+			return
+
+		q = queue 1
+		for filename in filenames
+			destFilename = filename
+			destFilename = destFilename.replace relativeTo, '' if relativeTo isnt '.'
+			destFilename = path.join dest, destFilename
+			console.log "#{filename} -> #{destFilename}" if @opts.verbose
+
+			node = @_searchNode filename, no
+			if node.files
+				# it's a directory, create it
+				mkdirp.sync destFilename
+			else
+				inStream = @createReadStream filename
+				q.defer writeStreamToFile, inStream, destFilename
+
+		q.awaitAll (err) => cb? err
+
 	# !!! ...
 	extractSync: (dest, archiveRoot='/', pattern=null) ->
 		filenames = @getEntries archiveRoot, pattern
@@ -310,6 +367,24 @@ module.exports = class AsarArchive
 		@_offset += stat.size
 		return
 
+	# adds a single file to archive
+	# also adds parent directories (without their files)
+	addSymlink: (filename, relativeTo, stat=null) ->
+		stat ?= fs.lstatSyc filename
+
+		link = path.relative(fs.realpathSync(this.src), fs.realpathSync(p));
+		if link.substr(0, 2) is '..'
+			throw new Error p + ': file links out of the archive'
+
+		p = path.relative relativeTo, filename
+		node = @_searchNode p
+		node.size = stat.size
+		node.offset = @_offset.toString()
+		if process.platform is 'win32' and stat.mode & 0o0100
+			node.executable = true
+		@_offset += stat.size
+		return
+
 	# removes a file from archive
 	#removeFile: (filename) ->
 
@@ -330,11 +405,11 @@ module.exports = class AsarArchive
 				console.log "+ #{path.sep}#{path.relative relativeTo, file.name}" if @opts.verbose
 				if file.stat.isDirectory()
 					@createDirectory path.relative relativeTo, file.name
-				else if file.stat.isFile()
+				else if file.stat.isFile() or file.stat.isSymbolicLink()
 					@addFile file.name, relativeTo, file.stat
-				#else if file.stat.isLink()
-					#filesystem.insertLink(file.name, file.stat);
-			return cb null
+				#else if file.stat.isSymbolicLink()
+				#	@addSymlink file.name, relativeTo, file.stat
+			return cb? null
 		return
 
 	# removes a directory and its files from archive
