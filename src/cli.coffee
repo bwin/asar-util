@@ -18,25 +18,26 @@ help = ->
 	console.log """
 #{pkg.name} [input] [output] [options]
 Parameter:
-input               path to archive or directory
-output              path to archive or directory
+input                 path to archive or directory
+output                path to archive or directory
 or if you prefer, you can set these with:
--i, --in <path>     specify input (can be archive or directory)
--o, --out <path>    specify output (can be archive or directory)
+-i, --in <path>       specify input (can be archive or directory)
+-o, --out <path>      specify output (can be archive or directory)
 Options:
--h, --help          show help and exit
--v, --version       show version and exit
--a, --add <path>    path to directory to add to archive
--r, --root <path>   set root path in archive
--w, --overwrite     overwrite files
--l, --list          list archive entries
--s, --size          also list size
-    --verify        verify archive integrity
--c, --colors		use terminal colors for output
--C, --compat        also read legacy asar format
--Q, --verbose       more feedback
-    --debug         a lot feedback
--q, --quiet         no feedback
+-h, --help            show help and exit
+-v, --version         show version and exit
+-a, --add <path>      path to directory to add to archive
+-r, --root <path>     set root path in archive
+-p, --pattern <glob>  set a filter pattern
+-w, --overwrite       overwrite files
+-l, --list            list archive entries
+-s, --size            also list size
+    --verify          verify archive integrity
+-c, --colors	  	  use terminal colors for output
+-C, --compat          also read legacy asar format
+-Q, --verbose         more feedback
+    --debug           a lot feedback
+-q, --quiet           no feedback
 Examples:
 create archive from dir:            asar-util dir archive
 same with named parameters:         asar-util -i dir -o archive
@@ -46,6 +47,7 @@ extract d/file from archive to dir: asar-util archive dir -r d/file
 verify archive:                     asar-util archive --verify
 list archive entries:               asar-util archive -l
 list archive entries for root:      asar-util archive -l -r root
+list entries for root with pattern: asar-util archive -l -r root -p pattern
 list archive entries with size:     asar-util archive -ls
 	"""
 
@@ -67,6 +69,7 @@ showVersion = argv.version or argv.v
 input = argv.i or argv.in or argv._[0]
 output = argv.o or argv.out or argv._[1]
 root = argv.r or argv.root
+pattern = argv.p or argv.pattern
 doOverwrite = argv.w or argv.overwrite
 showList = argv.l or argv.list
 showListSize = argv.s or argv.size
@@ -117,7 +120,7 @@ else if input
 			# list archive content with size
 			try
 				archive = asar.loadArchive input
-				entries = archive.getEntries root
+				entries = archive.getEntries root, pattern
 			catch err
 				generalError err.message
 			for entry in entries
@@ -129,7 +132,7 @@ else if input
 		else
 			# list archive content
 			try
-				entries = asar.getEntries input, root
+				entries = asar.getEntries input, root, pattern
 			catch err
 				generalError err.message
 			console.log entries.join os.EOL
@@ -146,18 +149,18 @@ else if input
 
 		if inputStat.isDirectory()
 			# create archive
-			console.log "packing #{input.info} to #{output.info}" if verbose
+			console.log "packing #{(input + (pattern or '')).info} to #{output.info}" if verbose
 			try
-				asar.createArchive input, output, (err) ->
+				asar.createArchive input, output, pattern, (err) ->
 					generalError err.message if err
 					return done()
 			catch err
 				generalError err.message
 		else
 			# extract archive
-			console.log "extracting #{(input + root).info} to #{output.info}" if verbose
+			console.log "extracting #{(input + root + (pattern or '')).info} to #{output.info}" if verbose
 			try
-				asar.extractArchive input, output, root
+				asar.extractArchive input, output, root, pattern
 				done()
 			catch err
 				generalError err.message

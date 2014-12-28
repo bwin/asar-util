@@ -4,26 +4,13 @@ path = require 'path'
 crypto = require 'crypto'
 
 walkdir = require 'walkdir'
+minimatch = require 'minimatch'
 mkdirp = require 'mkdirp'
 
-crawlFilesystem = (dir, cb) ->
-	# cb: (err, paths)
-	paths = []
-
-	walker = walkdir dir
-	walker.on 'path', (p, stat) ->
-		paths.push
-			name: p
-			stat: stat
-		return
-	walker.on 'end', ->
-		paths.sort (a, b) ->
-			return -1 if a.name < b.name
-			return 1 if a.name > b.name
-			return 0
-		return cb null, paths
-	walker.on 'error', cb
-	return
+sortBy = (prop) -> (a, b) ->
+	return -1 if a[prop] < b[prop]
+	return 1 if a[prop] > b[prop]
+	return 0
 
 module.exports = class AsarArchive
 	constructor: (@opts) ->
@@ -48,15 +35,19 @@ module.exports = class AsarArchive
 
 	_searchNode: (p, create=yes) ->
 		p = p.substr 1 if p[0] in '/\\'.split '' # get rid of leading slash
-		#console.log "_searchNode", p
+		#! console.log "_searchNode", p
 		name = path.basename p
 		node = @_header
 		dirs = path.dirname(p).split path.sep
 		for dir in dirs
 			throw new Error "#{p} not found." unless node?
-			node = node.files[dir] if dir isnt '.'
-		node.files[name] = {} if create
+			if dir isnt '.'
+				node.files[dir] ?= {files:{}} if create
+				node = node.files[dir]
+			#! console.log "dir", dir, @_header
 		throw new Error "#{p} not found." unless node?
+		#! console.log "header,node,return", @_header, node, node.files[name]
+		node.files[name] ?= {} if create
 		node = node.files[name]
 		return node
 
@@ -64,7 +55,7 @@ module.exports = class AsarArchive
 		magicLen = @MAGIC.length
 		magicBuf = new Buffer magicLen
 		if fs.readSync(fd, magicBuf, 0, magicLen, null) isnt magicLen
-			throw new Error 'Unable to read from archive'
+			throw new Error "Unable to open archive: #{@_archiveName}"
 		if magicBuf.toString() isnt @MAGIC
 			#throw new Error 'Invalid magic number'
 			#console.warn 'Deprecation notice: old version of asar archive.'
@@ -73,22 +64,22 @@ module.exports = class AsarArchive
 		sizeBufSize = 4
 		sizeBuf = new Buffer sizeBufSize
 		if fs.readSync(fd, sizeBuf, 0, sizeBufSize, null) isnt sizeBufSize
-			throw new Error 'Unable to read header size'
+			throw new Error "Unable to read header size: #{@_archiveName}"
 		size = sizeBuf.readUInt32LE 0
 
 		headerBuf = new Buffer size
 		if fs.readSync(fd, headerBuf, 0, size, null) isnt size
-			throw new Error 'Unable to read header'
+			throw new Error "Unable to read header: #{@_archiveName}"
 
 		checksumSize = 16
 		@_checksum = new Buffer checksumSize
 		if fs.readSync(fd, @_checksum, 0, checksumSize, @_archiveSize - 16 - 4) isnt checksumSize
-			throw new Error 'Unable to read checksum'
+			throw new Error "Unable to read checksum: #{@_archiveName}"
 
 		try
 			@_header = JSON.parse headerBuf
 		catch err
-			throw new Error 'Unable to parse header'
+			throw new Error "Unable to parse header: #{@_archiveName}"
 		@_headerSize = size
 		return
 
@@ -153,6 +144,25 @@ module.exports = class AsarArchive
 			return
 		return
 
+	_crawlFilesystem: (dir, pattern, cb) ->
+		# cb: (err, paths=[{name, stat}, ...])
+		paths = []
+
+		walker = walkdir dir
+		walker.on 'path', (p, stat) ->
+			paths.push
+				name: p
+				stat: stat
+			return
+		walker.on 'end', =>
+			if pattern
+				matchFn = minimatch.filter pattern, matchBase: yes
+				paths = paths.filter (a) ->	matchFn path.sep + path.relative dir, a.name
+			paths.sort sortBy 'name'
+			return cb null, paths
+		walker.on 'error', cb
+		return
+
 	# opens an asar archive from disk
 	#open: (archiveName, cb) ->
 	openSync: (archiveName) ->
@@ -202,7 +212,7 @@ module.exports = class AsarArchive
 	#	return
 
 	# retrieves a list of all entries (dirs, files) in archive
-	getEntries: (archiveRoot='/')->
+	getEntries: (archiveRoot='/', pattern=null)->
 		archiveRoot = archiveRoot.substr 1 if archiveRoot.length > 1 and archiveRoot[0] in '/\\'.split '' # get rid of leading slash
 		files = []
 		fillFilesFromHeader = (p, json) ->
@@ -221,6 +231,9 @@ module.exports = class AsarArchive
 			archiveRoot = "#{path.sep}#{archiveRoot}"
 
 		fillFilesFromHeader archiveRoot, json
+
+		files = files.filter minimatch.filter pattern, matchBase: yes if pattern
+
 		return files
 
 	# !!! ...
@@ -245,8 +258,8 @@ module.exports = class AsarArchive
 		return yes
 		
 	# !!! ...
-	extractSync: (dest, archiveRoot='/') ->
-		filenames = @getEntries archiveRoot
+	extractSync: (dest, archiveRoot='/', pattern=null) ->
+		filenames = @getEntries archiveRoot, pattern
 		if filenames.length is 1
 			archiveRoot = path.dirname archiveRoot
 		else
@@ -308,8 +321,11 @@ module.exports = class AsarArchive
 
 	# adds a directory and it's files to archive
 	# also adds parent directories (but without their files)
-	addDirectory: (dirname, relativeTo, cb) ->
-		crawlFilesystem dirname, (err, files) =>
+	addDirectory: (dirname, relativeTo, opts, cb) ->
+		if typeof opts is 'function'
+			cb = opts
+			opts = {}
+		@_crawlFilesystem dirname, opts.pattern, (err, files) =>
 			for file in files
 				console.log "+ #{path.sep}#{path.relative relativeTo, file.name}" if @opts.verbose
 				if file.stat.isDirectory()

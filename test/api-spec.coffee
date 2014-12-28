@@ -36,6 +36,15 @@ describe 'api:', ->
 			expected = expected.replace(/\//g, '\\').replace(/\r\n/g, '\n')
 		return assert.equal actual, expected
 
+	it 'should list files/dirs for pattern in archive', ->
+		archive = asar.loadArchive 'test/input/extractthis.asar'
+		actual = archive.getEntries('/', '*.txt').join '\n'
+		expected = fs.readFileSync 'test/expected/extractthis-filelist-txt-only.txt', 'utf8'
+		# on windows replace slashes with backslashes and crlf with lf
+		if os.platform() is 'win32'
+			expected = expected.replace(/\//g, '\\').replace(/\r\n/g, '\n')
+		return assert.equal actual, expected
+
 	it 'should extract a text file (to memory) from archive', ->
 		archive = asar.loadArchive 'test/input/extractthis.asar'
 		actual = archive.getFile('dir1/file1.txt').toString 'utf8'
