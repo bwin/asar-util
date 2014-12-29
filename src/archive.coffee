@@ -14,7 +14,7 @@ sortBy = (prop) -> (a, b) ->
 	return 0
 
 module.exports = class AsarArchive
-	MAGIC: 'ASAR'
+	MAGIC: 'ASAR\r\n'
 	VERSION: 1
 
 	constructor: (@opts) ->
@@ -63,25 +63,28 @@ module.exports = class AsarArchive
 			return @_readHeaderOld fd
 
 		sizeBufSize = 4
-		sizeBuf = new Buffer sizeBufSize
-		if fs.readSync(fd, sizeBuf, 0, sizeBufSize, null) isnt sizeBufSize
+		headerSizeOfs = @_archiveSize - (4 + 16 + 4) # headerSize, checksum, archiveSize
+		headerSizeBuf = new Buffer sizeBufSize
+		if fs.readSync(fd, headerSizeBuf, 0, sizeBufSize, headerSizeOfs) isnt sizeBufSize
 			throw new Error "Unable to read header size: #{@_archiveName}"
-		size = sizeBuf.readUInt32LE 0
+		headerSize = headerSizeBuf.readUInt32LE 0
 
-		headerBuf = new Buffer size
-		if fs.readSync(fd, headerBuf, 0, size, null) isnt size
+		headerOfs = @_archiveSize - headerSize - (4 + 16 + 4) # headerSize, checksum, archiveSize
+		headerBuf = new Buffer headerSize
+		if fs.readSync(fd, headerBuf, 0, headerSize, headerOfs) isnt headerSize
 			throw new Error "Unable to read header: #{@_archiveName}"
 
 		checksumSize = 16
+		checksumOfs = @_archiveSize - 16 - 4 # checksum, archiveSize
 		@_checksum = new Buffer checksumSize
-		if fs.readSync(fd, @_checksum, 0, checksumSize, @_archiveSize - 16 - 4) isnt checksumSize
+		if fs.readSync(fd, @_checksum, 0, checksumSize, checksumOfs) isnt checksumSize
 			throw new Error "Unable to read checksum: #{@_archiveName}"
 
 		try
 			@_header = JSON.parse headerBuf
 		catch err
 			throw new Error "Unable to parse header: #{@_archiveName}"
-		@_headerSize = size
+		@_headerSize = headerSize
 		return
 
 	_readHeaderOld: (fd) ->
@@ -115,32 +118,34 @@ module.exports = class AsarArchive
 		return
 
 	_writeHeader: (out, cb) ->
-		headerStr = JSON.stringify @_header
-
-		@_headerSize = headerStr.length
-		sizeBuf = new Buffer 4
-		sizeBuf.writeUInt32LE @_headerSize, 0
-
-		out.write @MAGIC, ->
-			out.write sizeBuf, ->
-				out.write headerStr, cb
+		out.write @MAGIC, cb
 		return
 
 	_writeFooter: (out, cb) ->
-		archiveFile = fs.createReadStream @_archiveName
-		md5 = crypto.createHash('md5')
-		archiveFile.pipe md5
-		archiveFile.on 'end', =>
-			# is this really ok ???
-			@_checksum = md5.read()
-			@_archiveSize = 8 + @_headerSize + @_offset + 16 + 4  
-			if @_archiveSize > 4294967295 # because of js precision limit
-				return cb? new Error "archive size can not be larger than 4.2GB"
-			sizeBuf = new Buffer 4
-			sizeBuf.writeUInt32LE @_archiveSize, 0
+		headerStr = JSON.stringify @_header
 
-			out.write @_checksum, ->
-				out.write sizeBuf, cb
+		@_headerSize = headerStr.length
+		headerSizeBuf = new Buffer 4
+		headerSizeBuf.writeUInt32LE @_headerSize, 0
+		
+		out.write headerStr, =>
+			out.write headerSizeBuf, =>
+				archiveFile = fs.createReadStream @_archiveName
+				md5 = crypto.createHash('md5')
+				archiveFile.pipe md5
+				archiveFile.on 'end', =>
+					# is this really ok ???
+					@_checksum = md5.read()
+					@_archiveSize = 4 + @_offset + @_headerSize + 4 + 16 + 4  
+					if @_archiveSize > 4294967295 # because of js precision limit
+						return cb? new Error "archive size can not be larger than 4.2GB"
+					archiveSizeBuf = new Buffer 4
+					archiveSizeBuf.writeUInt32LE @_archiveSize, 0
+
+					out.write @_checksum, ->
+						out.write archiveSizeBuf, cb
+						return
+					return
 				return
 			return
 		return
@@ -248,7 +253,11 @@ module.exports = class AsarArchive
 		node = @_searchNode filename, no
 		return '' unless node.size > 0
 		buffer = new Buffer node.size
-		fs.readSync fd, buffer, 0, node.size, 8 + @_headerSize + parseInt node.offset, 10
+		unless @_legacyMode
+			offset = @MAGIC.length + parseInt node.offset, 10
+		else
+			offset = 8 + @_headerSize + parseInt node.offset, 10
+		fs.readSync fd, buffer, 0, node.size, offset
 		fs.closeSync fd
 		return buffer
 	
@@ -262,7 +271,10 @@ module.exports = class AsarArchive
 	createReadStream: (filename) ->
 		node = @_searchNode filename, no
 		if node.size > 0
-			start = 8 + @_headerSize + parseInt node.offset, 10
+			unless @_legacyMode
+				start = @MAGIC.length + parseInt node.offset, 10
+			else
+				start = 8 + @_headerSize + parseInt node.offset, 10
 			end = start + node.size - 1
 			return fs.createReadStream @_archiveName, start: start, end: end
 		else
