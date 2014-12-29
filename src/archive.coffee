@@ -3,10 +3,12 @@ fs = require 'fs'
 path = require 'path'
 crypto = require 'crypto'
 stream = require 'stream'
+zlib = require 'zlib'
 
 walkdir = require 'walkdir'
 minimatch = require 'minimatch'
 mkdirp = require 'mkdirp'
+queue = require 'queue-async'
 
 sortBy = (prop) -> (a, b) ->
 	return -1 if a[prop] < b[prop]
@@ -17,7 +19,10 @@ module.exports = class AsarArchive
 	MAGIC: 'ASAR\r\n'
 	VERSION: 1
 
-	constructor: (@opts) ->
+	constructor: (@opts={}) ->
+		# default options
+		@opts.minSizeToCompress ?= 256
+
 		@reset()
 		return
 
@@ -26,9 +31,10 @@ module.exports = class AsarArchive
 			version: @VERSION
 			files: {}
 		@_headerSize = 0
-		@_offset = 0
+		@_offset = @MAGIC.length #0
 		@_archiveSize = 0
 		@_files = []
+		@_fileNodes = []
 		@_archiveName = null
 		@_checksum = null
 		@_legacyMode = no
@@ -112,7 +118,7 @@ module.exports = class AsarArchive
 			headerStr = headerBuf.toString().replace /\0+$/g, ''
 			@_header = JSON.parse headerStr
 		catch err
-			console.log "header:'#{x}'",err
+			#console.log "header:'#{x}'",err
 			throw new Error 'Unable to parse header (assumed old format)'
 		@_headerSize = size
 		return
@@ -122,7 +128,11 @@ module.exports = class AsarArchive
 		return
 
 	_writeFooter: (out, cb) ->
-		headerStr = JSON.stringify @_header
+		if @opts.prettyToc
+			headerStr = JSON.stringify(@_header, null, '  ').replace /\n/g, '\r\n'
+			headerStr = "\r\n#{headerStr}\r\n"
+		else
+			headerStr = JSON.stringify @_header
 
 		@_headerSize = headerStr.length
 		headerSizeBuf = new Buffer 4
@@ -195,19 +205,40 @@ module.exports = class AsarArchive
 		# create output dir if necessary
 		mkdirp.sync path.dirname archiveName
 
-		queue = require 'queue-async'
-
-		writeFile = (filename, out, cb) ->
+		writeFile = (filename, out, node, cb) =>
+			realSize = 0
 			src = fs.createReadStream filename
-			src.on 'end', cb
-			src.pipe out, end: no
+			
+			if @opts.compress and node.size > @opts.minSizeToCompress
+				gzip = zlib.createGzip()
+				gzip.on 'data', (chunk) ->
+					realSize += chunk.length
+					return
+				gzip.on 'end', =>
+					node.offset = @_offset
+					node.csize = realSize
+					@_offset += realSize
+					cb()
+					return
+				src.pipe gzip
+				gzip.pipe out, end: no
+			else
+				src.on 'data', (chunk) ->
+					realSize += chunk.length
+					return
+				src.on 'end', =>
+					node.offset = @_offset
+					@_offset += realSize
+					cb()
+					return
+				src.pipe out, end: no
 			return
 		
 		out = fs.createWriteStream archiveName
 		@_writeHeader out, =>
 			q = queue 1
-			for file in @_files
-				q.defer writeFile, file, out
+			for file, i in @_files
+				q.defer writeFile, file, out, @_fileNodes[i]
 				q.awaitAll (err) =>
 					return cb? err if err
 					@_writeFooter out, cb
@@ -248,18 +279,18 @@ module.exports = class AsarArchive
 		return node
 
 	# !!! ...
-	getFile: (filename) ->
-		fd = fs.openSync @_archiveName, 'r'
-		node = @_searchNode filename, no
-		return '' unless node.size > 0
-		buffer = new Buffer node.size
-		unless @_legacyMode
-			offset = @MAGIC.length + parseInt node.offset, 10
-		else
-			offset = 8 + @_headerSize + parseInt node.offset, 10
-		fs.readSync fd, buffer, 0, node.size, offset
-		fs.closeSync fd
-		return buffer
+	#getFile: (filename) ->
+	#	fd = fs.openSync @_archiveName, 'r'
+	#	node = @_searchNode filename, no
+	#	return '' unless node.size > 0
+	#	buffer = new Buffer node.size
+	#	unless @_legacyMode
+	#		offset = @MAGIC.length + node.offset
+	#	else
+	#		offset = 8 + @_headerSize + parseInt node.offset, 10
+	#	fs.readSync fd, buffer, 0, node.size, offset
+	#	fs.closeSync fd
+	#	return buffer
 	
 	# !!! ...
 	extractFileSync: (filename, destFilename) ->
@@ -272,11 +303,19 @@ module.exports = class AsarArchive
 		node = @_searchNode filename, no
 		if node.size > 0
 			unless @_legacyMode
-				start = @MAGIC.length + parseInt node.offset, 10
+				start = node.offset
 			else
 				start = 8 + @_headerSize + parseInt node.offset, 10
-			end = start + node.size - 1
-			return fs.createReadStream @_archiveName, start: start, end: end
+			size = node.csize or node.size
+			end = start + size - 1
+			inStream = fs.createReadStream @_archiveName, start: start, end: end
+
+			if node.csize?
+				gunzip = zlib.createGunzip()
+				inStream.pipe gunzip
+				return gunzip
+
+			return inStream
 		else
 			emptyStream = stream.Readable()
 			emptyStream.push null
@@ -302,10 +341,13 @@ module.exports = class AsarArchive
 		relativeTo = relativeTo.substr 1 if relativeTo[0] in '/\\'.split ''
 		relativeTo = relativeTo[...-1] if relativeTo[-1..] in '/\\'.split ''
 
-		writeStreamToFile = (inStream, destFilename, cb) ->
+		writeStreamToFile = (filename, destFilename, cb) =>
+			inStream = @createReadStream filename
+
 			out = fs.createWriteStream destFilename
-			inStream.on 'end', cb
-			inStream.on 'error', cb
+			out.on 'finish', cb
+			out.on 'error', cb
+
 			inStream.pipe out
 			return
 
@@ -318,40 +360,41 @@ module.exports = class AsarArchive
 
 			node = @_searchNode filename, no
 			if node.files
-				# it's a directory, create it
-				mkdirp.sync destFilename
+				q.defer mkdirp, destFilename
 			else
-				inStream = @createReadStream filename
-				q.defer writeStreamToFile, inStream, destFilename
+				destDir = path.dirname destFilename
+				q.defer mkdirp, destDir
+				q.defer writeStreamToFile, filename, destFilename
 
-		q.awaitAll (err) => cb? err
+		q.awaitAll cb
+		return
 
 	# !!! ...
-	extractSync: (dest, archiveRoot='/', pattern=null) ->
-		filenames = @getEntries archiveRoot, pattern
-		if filenames.length is 1
-			archiveRoot = path.dirname archiveRoot
-		else
-			mkdirp.sync dest # create destination directory
-		relativeTo = archiveRoot
-		relativeTo = relativeTo.substr 1 if relativeTo[0] in '/\\'.split ''
-		relativeTo = relativeTo[...-1] if relativeTo[-1..] in '/\\'.split ''
-
-		for filename in filenames
-			destFilename = filename
-			#destFilename = path.relative destFilename, relativeTo if relativeTo isnt '.'
-			destFilename = destFilename.replace relativeTo, '' if relativeTo isnt '.'
-			destFilename = path.join dest, destFilename
-			#dbg console.log "filename=#{filename} relativeTo=#{relativeTo} archiveRoot=#{archiveRoot} destFilename=#{destFilename}"
-			console.log "#{filename} -> #{destFilename}" if @opts.verbose
-			node = @_searchNode filename, no
-			if node.files
-				# it's a directory, create it
-				mkdirp.sync destFilename
-			else
-				# it's a file, extract it
-				@extractFileSync filename, destFilename
-		return yes
+	#extractSync: (dest, archiveRoot='/', pattern=null) ->
+	#	filenames = @getEntries archiveRoot, pattern
+	#	if filenames.length is 1
+	#		archiveRoot = path.dirname archiveRoot
+	#	else
+	#		mkdirp.sync dest # create destination directory
+	#	relativeTo = archiveRoot
+	#	relativeTo = relativeTo.substr 1 if relativeTo[0] in '/\\'.split ''
+	#	relativeTo = relativeTo[...-1] if relativeTo[-1..] in '/\\'.split ''
+	#
+	#	for filename in filenames
+	#		destFilename = filename
+	#		#destFilename = path.relative destFilename, relativeTo if relativeTo isnt '.'
+	#		destFilename = destFilename.replace relativeTo, '' if relativeTo isnt '.'
+	#		destFilename = path.join dest, destFilename
+	#		#dbg console.log "filename=#{filename} relativeTo=#{relativeTo} archiveRoot=#{archiveRoot} destFilename=#{destFilename}"
+	#		console.log "#{filename} -> #{destFilename}" if @opts.verbose
+	#		node = @_searchNode filename, no
+	#		if node.files
+	#			# it's a directory, create it
+	#			mkdirp.sync destFilename
+	#		else
+	#			# it's a file, extract it
+	#			@extractFileSync filename, destFilename
+	#	return yes
 
 	# adds a single file to archive
 	# also adds parent directories (without their files)
@@ -365,36 +408,39 @@ module.exports = class AsarArchive
 
 		# this is only approximate
 		# we dont take into account the size of the header
-		if @_offset + stat.size > 4294967295
-			throw new Error "#{p}: archive size can not be larger than 4.2GB"
-
-		@_files.push filename
+		#if @_offset + stat.size > 4294967295
+		#	throw new Error "#{p}: archive size can not be larger than 4.2GB"
 
 		p = path.relative relativeTo, filename
 		node = @_searchNode p
 		node.size = stat.size
-		node.offset = @_offset.toString()
+		#node.offset = @_offset.toString()
+		
+		return if node.size is 0
+
+		@_files.push filename
+		@_fileNodes.push node
+		
 		if process.platform is 'win32' and stat.mode & 0o0100
 			node.executable = true
-		@_offset += stat.size
 		return
 
 	# adds a single file to archive
 	# also adds parent directories (without their files)
 	addSymlink: (filename, relativeTo, stat=null) ->
-		stat ?= fs.lstatSyc filename
+		#stat ?= fs.lstatSyc filename
 
-		link = path.relative(fs.realpathSync(this.src), fs.realpathSync(p));
-		if link.substr(0, 2) is '..'
-			throw new Error p + ': file links out of the archive'
+		#link = path.relative(fs.realpathSync(this.src), fs.realpathSync(p));
+		#if link.substr(0, 2) is '..'
+		#	throw new Error p + ': file links out of the archive'
 
-		p = path.relative relativeTo, filename
-		node = @_searchNode p
-		node.size = stat.size
-		node.offset = @_offset.toString()
-		if process.platform is 'win32' and stat.mode & 0o0100
-			node.executable = true
-		@_offset += stat.size
+		#p = path.relative relativeTo, filename
+		#node = @_searchNode p
+		#node.size = stat.size
+		#node.offset = @_offset.toString()
+		#if process.platform is 'win32' and stat.mode & 0o0100
+		#	node.executable = true
+		#@_offset += stat.size
 		return
 
 	# removes a file from archive

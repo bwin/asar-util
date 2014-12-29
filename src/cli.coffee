@@ -10,7 +10,7 @@ pkg = require '../package'
 
 argv = minimist process.argv.slice(2),
 	string: '_ i in o out a add r root'.split ' '
-	boolean: 'h help v version w l list s verify c colors C compat verbose Q q quiet'.split ' '
+	boolean: 'h help v version examples w overwrite z compress P pretty l list s size verify c colors C compat Q verbose debug q quiet'.split ' '
 	default:
 		root: '/'
 
@@ -26,18 +26,26 @@ or if you prefer, you can set these with:
 Options:
 -h, --help            show help and exit
 -v, --version         show version and exit
+    --examples        show example usage
 -a, --add <path>      path to directory to add to archive
 -r, --root <path>     set root path in archive
 -p, --pattern <glob>  set a filter pattern
 -w, --overwrite       overwrite files
+-z, --compress        gzip file contents
+-P, --pretty          write pretty printed json TOC
 -l, --list            list archive entries
 -s, --size            also list size
     --verify          verify archive integrity
--c, --colors	  	  use terminal colors for output
+-c, --colors          use terminal colors for output
 -C, --compat          also read legacy asar format
 -Q, --verbose         more feedback
     --debug           a lot feedback
 -q, --quiet           no feedback
+	"""
+
+examples = ->
+	console.log """
+#{pkg.name}
 Examples:
 create archive from dir:            asar-util dir archive
 same with named parameters:         asar-util -i dir -o archive
@@ -51,26 +59,16 @@ list entries for root with pattern: asar-util archive -l -r root -p pattern
 list archive entries with size:     asar-util archive -ls
 	"""
 
-usageError = (msg) ->
-	console.error "usage error: #{msg}#{os.EOL}".error
-	help()
-	process.exit -1
-
-generalError = (msg) ->
-	console.error "#{msg}#{os.EOL}".error
-	process.exit 1
-
-done = ->
-	console.log "ok.".success
-	process.exit 0
-
 showHelp = argv.help or argv.h
 showVersion = argv.version or argv.v
+showExamples = argv.examples
 input = argv.i or argv.in or argv._[0]
 output = argv.o or argv.out or argv._[1]
 root = argv.r or argv.root
 pattern = argv.p or argv.pattern
 doOverwrite = argv.w or argv.overwrite
+doCompress = argv.z or argv.compress
+prettyPrint = argv.P or argv.pretty
 showList = argv.l or argv.list
 showListSize = argv.s or argv.size
 verify = argv.verify
@@ -93,6 +91,20 @@ else
 	String::__defineGetter__ 'info', -> '' + @
 	String::__defineGetter__ 'success', -> '' + @
 
+usageError = (msg) ->
+	console.error "usage error: #{msg}#{os.EOL}".error
+	help()
+	process.exit -1
+
+generalError = (msg) ->
+	console.error "#{msg}#{os.EOL}".error
+	process.exit 1
+
+done = (err) ->
+	generalError err.message if err
+	console.log "ok.".success
+	process.exit 0
+
 
 if verbose
 	asar.opts.verbose = yes
@@ -100,10 +112,16 @@ if verbose
 if debug
 	asar.opts.debug = yes
 	usageError 'Y U mix --debug and --quiet ?! U crazy' if quiet
+asar.opts.compress = yes if doCompress
+asar.opts.prettyToc = yes if prettyPrint
 
 # show usage info (explicit)
 if showHelp
 	help()
+
+# show examples
+else if showExamples
+	examples()
 
 # show version info
 else if showVersion
@@ -150,20 +168,14 @@ else if input
 		if inputStat.isDirectory()
 			# create archive
 			console.log "packing #{(input + (pattern or '')).info} to #{output.info}" if verbose
-			try
-				asar.createArchive input, output, pattern, (err) ->
-					generalError err.message if err
-					return done()
-			catch err
-				generalError err.message
+			asar.createArchive input, output, pattern, done
 		else
 			# extract archive
 			console.log "extracting #{(input + root + (pattern or '')).info} to #{output.info}" if verbose
-			try
-				asar.extractArchiveSync input, output, root, pattern
-				done()
-			catch err
-				generalError err.message
+			asar.extractArchive input, output,
+				root: root
+				pattern: pattern
+			, done
 
 	# input but nothing else
 	else usageError 'not enough arguments'
