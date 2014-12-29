@@ -1,6 +1,7 @@
 
 # TODO
 - [ ] support symlinks
+- [ ] ?? --pretty: nicer json-header
 - [ ] use opts in sync-api, too
 - [ ] archive.stat & ltstat & (...sync)
 - [ ] original asar: test (and fix) extracting empty files
@@ -18,11 +19,12 @@
 - [ ] 
 
 # MAYBE's
-- [ ] ??? treat ints as ints instead of strings (internally and in json) [@_offset, node.offset]
+- [ ] ??? treat ints as ints instead of strings (internally and in json) (@_offset, node.offset) (compability with asar-orig?!)
 - [ ] ditch asar, just use regular zip file
-- [ ] use vinyl (vinyl-fs & vinyl-asar)
-- [ ] put crawlFilesystem in exports or as separate npm module
-- [ ] option to use short header keys (v, _, s, o, l) (expandHeaderKeys if header.v)
+- [ ] ditch sync-api ?
+- [ ] use vinyl (vinyl-fs & vinyl-asar) ?
+- [ ] put crawlFilesystem in exports or as separate npm module ?
+- [ ] option to use short header keys (v, _, s, o, l) (expandHeaderKeys if header.v) ?
 - [ ] 
 
 
