@@ -76,7 +76,7 @@ describe 'api:', ->
 	describe 'archive node_modules:', ->
 		src = 'node_modules/'
 		archiveFilename = 'tmp/modules-api.asar'
-		extractTo = 'tmp/modules-api-async/'
+		extractTo = 'tmp/modules-api/'
 
 		it 'create it', (done) ->
 			asar.createArchive src, archiveFilename, (err) ->
@@ -91,7 +91,7 @@ describe 'api:', ->
 			compDirs extractTo, src, done
 			return
 
-		it 'extract coffee-script async', (done) ->
+		it 'extract coffee-script', (done) ->
 			asar.extractArchive archiveFilename, 'tmp/coffee-script-api/', root: 'coffee-script/', done
 			return
 

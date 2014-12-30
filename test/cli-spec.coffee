@@ -2,6 +2,7 @@
 assert = require 'assert'
 fs = require 'fs'
 os = require 'os'
+path = require 'path'
 exec = require('child_process').exec
 
 asar = require '../lib/asar'
