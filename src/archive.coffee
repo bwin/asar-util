@@ -248,8 +248,6 @@ module.exports = class AsarArchive
 					
 			return
 		return
-	#writeSync: (archiveName) ->
-	#	return
 
 	verify: (cb) ->
 		endOfs = @_offset + @_headerSize + 4 - 1
@@ -291,30 +289,10 @@ module.exports = class AsarArchive
 
 		return files
 
-	# !!! ...
-	getMetadata: (filename) ->
-		node = @_searchNode filename, no
-		return node
-
-	# !!! ...
-	#getFile: (filename) ->
-	#	fd = fs.openSync @_archiveName, 'r'
+	# shouldn't be public
+	#getMetadata: (filename) ->
 	#	node = @_searchNode filename, no
-	#	return '' unless node.size > 0
-	#	buffer = new Buffer node.size
-	#	unless @_legacyMode
-	#		offset = @MAGIC.length + node.offset
-	#	else
-	#		offset = 8 + @_headerSize + parseInt node.offset, 10
-	#	fs.readSync fd, buffer, 0, node.size, offset
-	#	fs.closeSync fd
-	#	return buffer
-	
-	# !!! ...
-	extractFileSync: (filename, destFilename) ->
-		mkdirp.sync path.dirname destFilename
-		fs.writeFileSync destFilename, @getFile filename
-		return yes
+	#	return node
 
 	# !!! ...
 	createReadStream: (filename) ->
@@ -340,11 +318,14 @@ module.exports = class AsarArchive
 			return emptyStream
 		
 	# !!! ...
+	# opts can be string or object
+	# extract('dest', 'filename', cb) can be used to extract a single file
 	extract: (dest, opts, cb) ->
 		# make opts optional
 		if typeof opts is 'function'
 			cb = opts
 			opts = {}
+		opts = root: opts if typeof opts is 'string'
 		# init default opts
 		archiveRoot = opts.root or '/'
 		pattern = opts.pattern
@@ -374,7 +355,8 @@ module.exports = class AsarArchive
 			destFilename = filename
 			destFilename = destFilename.replace relativeTo, '' if relativeTo isnt '.'
 			destFilename = path.join dest, destFilename
-			console.log "#{filename} -> #{destFilename}" if @opts.verbose
+			#console.log "#{filename} -> #{destFilename}" if @opts.verbose
+			console.log "-> #{destFilename}" if @opts.verbose
 
 			node = @_searchNode filename, no
 			if node.files
@@ -386,33 +368,6 @@ module.exports = class AsarArchive
 
 		q.awaitAll cb
 		return
-
-	# !!! ...
-	#extractSync: (dest, archiveRoot='/', pattern=null) ->
-	#	filenames = @getEntries archiveRoot, pattern
-	#	if filenames.length is 1
-	#		archiveRoot = path.dirname archiveRoot
-	#	else
-	#		mkdirp.sync dest # create destination directory
-	#	relativeTo = archiveRoot
-	#	relativeTo = relativeTo.substr 1 if relativeTo[0] in '/\\'.split ''
-	#	relativeTo = relativeTo[...-1] if relativeTo[-1..] in '/\\'.split ''
-	#
-	#	for filename in filenames
-	#		destFilename = filename
-	#		#destFilename = path.relative destFilename, relativeTo if relativeTo isnt '.'
-	#		destFilename = destFilename.replace relativeTo, '' if relativeTo isnt '.'
-	#		destFilename = path.join dest, destFilename
-	#		#dbg console.log "filename=#{filename} relativeTo=#{relativeTo} archiveRoot=#{archiveRoot} destFilename=#{destFilename}"
-	#		console.log "#{filename} -> #{destFilename}" if @opts.verbose
-	#		node = @_searchNode filename, no
-	#		if node.files
-	#			# it's a directory, create it
-	#			mkdirp.sync destFilename
-	#		else
-	#			# it's a file, extract it
-	#			@extractFileSync filename, destFilename
-	#	return yes
 
 	# adds a single file to archive
 	# also adds parent directories (without their files)
