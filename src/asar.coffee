@@ -24,6 +24,10 @@ loadArchive = (archiveFilename) ->
 	archive.openSync archiveFilename
 	return archive
 
+verifyArchive = (cb) ->
+	loadArchive(archiveFilename).archive.verify cb
+	return
+
 # retrieves a list of entries (dirs, files) in archive:/archiveRoot
 getEntries = (archiveFilename, archiveRoot='/', pattern=null)->
 	return loadArchive(archiveFilename).getEntries archiveRoot, pattern
@@ -34,7 +38,8 @@ extractArchiveSync = (archiveFilename, destDir, archiveRoot='/', pattern=null) -
 
 # extract archive:/archiveRoot
 extractArchive = (archiveFilename, destDir, opts, cb) ->
-	return loadArchive(archiveFilename).extract destDir, opts, cb
+	loadArchive(archiveFilename).extract destDir, opts, cb
+	return
 
 createReadStream = (archiveFilename, filename) ->
 	return loadArchive(archiveFilename).createReadStream filename
@@ -43,6 +48,7 @@ module.exports = {
 	AsarArchive
 	createArchive
 	loadArchive
+	verifyArchive
 	getEntries
 	extractArchiveSync
 	extractArchive

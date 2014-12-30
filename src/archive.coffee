@@ -80,6 +80,8 @@ module.exports = class AsarArchive
 		if fs.readSync(fd, headerBuf, 0, headerSize, headerOfs) isnt headerSize
 			throw new Error "Unable to read header: #{@_archiveName}"
 
+		@_offset = headerOfs
+
 		checksumSize = 16
 		checksumOfs = @_archiveSize - 16 - 4 # checksum, archiveSize
 		@_checksum = new Buffer checksumSize
@@ -144,6 +146,7 @@ module.exports = class AsarArchive
 				md5 = crypto.createHash('md5')
 				archiveFile.pipe md5
 				archiveFile.on 'end', =>
+				#md5.on 'finish', =>
 					# is this really ok ???
 					@_checksum = md5.read()
 					@_archiveSize = 4 + @_offset + @_headerSize + 4 + 16 + 4  
@@ -247,6 +250,21 @@ module.exports = class AsarArchive
 		return
 	#writeSync: (archiveName) ->
 	#	return
+
+	verify: (cb) ->
+		endOfs = @_offset + @_headerSize + 4 - 1
+		archiveFile = fs.createReadStream @_archiveName,
+			start: 0
+			end: endOfs
+		md5 = crypto.createHash('md5')
+		archiveFile.pipe md5
+		archiveFile.on 'end', =>
+			actual = md5.read().toString('hex')
+			excpected = @_checksum.toString('hex')
+			cb null, actual is excpected, {actual, excpected}
+			return
+		return
+
 
 	# retrieves a list of all entries (dirs, files) in archive
 	getEntries: (archiveRoot='/', pattern=null)->

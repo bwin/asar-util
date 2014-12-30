@@ -97,12 +97,12 @@ usageError = (msg) ->
 	process.exit -1
 
 generalError = (msg) ->
-	console.error "#{msg}#{os.EOL}".error
+	console.error "#{msg}#{os.EOL}".error unless quiet
 	process.exit 1
 
 done = (err) ->
 	generalError err.message if err
-	console.log "ok.".success
+	console.log "ok.".success unless quiet
 	process.exit 0
 
 
@@ -157,6 +157,19 @@ else if input
 		#done()
 
 	else if showListSize then usageError '--size can only be used with --list'
+
+	else if verify
+		usageError 'output and --verify not allowed together' if output
+		try
+			archive = asar.loadArchive input
+		catch err
+			generalError err.message
+		archive.verify (err, ok) ->
+			if ok
+				done()
+			else
+				generalError 'wrong checksum'
+
 
 	else if output
 		# transcode in -> out
