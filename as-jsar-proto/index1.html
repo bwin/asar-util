@@ -1,0 +1,16 @@
+<button onclick="addOne()">add one</button>
+<button onclick="removeOne()">remove one</button>
+
+<script type="text/javascript">
+	function addOne() {
+		x = document.createElement('webview');
+		x.src = 'https://www.github.com/';
+		document.body.appendChild(x);
+	}
+	function removeOne() {
+		x = document.getElementsByTagName('webview')[0];
+		if(x) {
+			document.body.removeChild(x);
+		}
+	}
+</script>

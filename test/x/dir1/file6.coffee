@@ -1,0 +1,1 @@
+console.log("** FROM file6.coffee", __filename, __dirname);

@@ -1,5 +1,16 @@
 
-fs = require 'fs'
+origFs = require 'fs'
+fs =
+	readDirSync: origFs.readDirSync
+	statSync: origFs.statSync
+	lstatSync: origFs.lstatSync
+	openSync: origFs.openSync
+	closeSync: origFs.closeSync
+	readSync: origFs.readSync
+	existsSync: origFs.existsSync
+	readSync: origFs.readSync
+	createReadStream: origFs.createReadStream
+	createWriteStream: origFs.createWriteStream
 os = require 'os'
 path = require 'path'
 crypto = require 'crypto'
@@ -8,6 +19,7 @@ zlib = require 'zlib'
 UINT64 = require('cuint').UINT64
 
 walkdir = require 'walkdir'
+glob = require 'glob'
 minimatch = require 'minimatch'
 mkdirp = require 'mkdirp'
 queue = require 'queue-async'
@@ -329,6 +341,26 @@ module.exports = class AsarArchive
 		node = @_searchNode filename, no
 		return node
 
+	getFile: (filename) ->
+		fd = fs.openSync @_archiveName, 'r'
+		node = @_searchNode filename, no
+		return '' unless node.size > 0
+		buffer = new Buffer node.size
+		unless @_legacyMode
+			start = node.offset
+		else
+			start = 8 + @_headerSize + parseInt node.offset, 10
+		size = node.csize or node.size
+		fs.readSync fd, buffer, 0, size, start
+		fs.closeSync fd
+		#var hash = crypto.createHash('md5').update(name).digest('hex');
+		if node.csize
+			throw new Error 'Synchronous decompression not supported in node < 0.11\nYou can try node-zlib-backport for node 0.10.x' unless zlib.gunzipSync?
+			buffer = zlib.gunzipSync buffer
+		#console.log "*** getFile #{filename}\n", buffer.toString(), "\n-------------------------"
+
+		return buffer#.toString()
+
 	# !!! ...
 	createReadStream: (filename) ->
 		node = @_searchNode filename, no
@@ -427,6 +459,8 @@ module.exports = class AsarArchive
 		
 		@_dirty = yes
 
+		#console.log "*** addfile", filename
+
 		# JavaScript can not precisely present integers >= UINT32_MAX.
 		if stat.size > MAX_SAFE_INTEGER
 			throw new Error "#{p}: file size can not be larger than 9PB"
@@ -492,6 +526,16 @@ module.exports = class AsarArchive
 						stat: file.stat
 				else if file.stat.isSymbolicLink()
 					@addSymlink file.name, relativeTo: relativeTo
+		#glob "#{dirname}/**/*.*", (err, matches) =>
+		#	for filename in matches
+		#		console.log "+ #{path.sep}#{path.relative relativeTo, filename}" if @opts.verbose
+		#		fileStat = fs.lstatSync filename
+		#		if fileStat.isDirectory()
+		#			@createDirectory path.relative relativeTo, filename
+		#		else if fileStat.isFile() #or file.stat.isSymbolicLink()
+		#			@addFile filename, relativeTo, fileStat
+		#		else if fileStat.isSymbolicLink()
+		#			@addSymlink filename, relativeTo, fileStat
 			return cb? null
 		return
 
