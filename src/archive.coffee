@@ -1,5 +1,6 @@
 
 fs = require 'fs'
+os = require 'os'
 path = require 'path'
 crypto = require 'crypto'
 stream = require 'stream'
@@ -329,6 +330,7 @@ module.exports = class AsarArchive
 		# init default opts
 		archiveRoot = opts.root or '/'
 		pattern = opts.pattern
+		symlinksSupported = os.platform() is 'win32'
 
 		filenames = @getEntries archiveRoot, pattern
 		if filenames.length is 1
@@ -361,6 +363,20 @@ module.exports = class AsarArchive
 			node = @_searchNode filename, no
 			if node.files
 				q.defer mkdirp, destFilename
+			else if node.link
+				if symlinksSupported
+					destDir = path.dirname destFilename
+					q.defer mkdirp, destDir
+
+					linkTo = path.join destDir, relativeTo, node.link
+					linkToRel = path.relative path.dirname(destFilename), linkTo
+
+					# try to delete output file first, because we can't overwrite a link
+					try fs.unlinkSync destFilename
+					fs.symlinkSync linkToRel, destFilename
+				else
+					console.log 'Warning: extracting symlinks on windows not yet supported'
+					# TODO
 			else
 				destDir = path.dirname destFilename
 				q.defer mkdirp, destDir
@@ -401,19 +417,14 @@ module.exports = class AsarArchive
 	# adds a single file to archive
 	# also adds parent directories (without their files)
 	addSymlink: (filename, relativeTo, stat=null) ->
-		#stat ?= fs.lstatSyc filename
+		p = path.relative relativeTo, filename
+		pDir = path.dirname path.join relativeTo, p
+		pAbsDir = path.resolve pDir
+		linkAbsolute = fs.realpathSync filename
+		linkTo = path.relative pAbsDir, linkAbsolute
 
-		#link = path.relative(fs.realpathSync(this.src), fs.realpathSync(p));
-		#if link.substr(0, 2) is '..'
-		#	throw new Error p + ': file links out of the archive'
-
-		#p = path.relative relativeTo, filename
-		#node = @_searchNode p
-		#node.size = stat.size
-		#node.offset = @_offset.toString()
-		#if process.platform is 'win32' and stat.mode & 0o0100
-		#	node.executable = true
-		#@_offset += stat.size
+		node = @_searchNode p
+		node.link = linkTo
 		return
 
 	# removes a file from archive
@@ -436,10 +447,10 @@ module.exports = class AsarArchive
 				console.log "+ #{path.sep}#{path.relative relativeTo, file.name}" if @opts.verbose
 				if file.stat.isDirectory()
 					@createDirectory path.relative relativeTo, file.name
-				else if file.stat.isFile() or file.stat.isSymbolicLink()
+				else if file.stat.isFile() #or file.stat.isSymbolicLink()
 					@addFile file.name, relativeTo, file.stat
-				#else if file.stat.isSymbolicLink()
-				#	@addSymlink file.name, relativeTo, file.stat
+				else if file.stat.isSymbolicLink()
+					@addSymlink file.name, relativeTo, file.stat
 			return cb? null
 		return
 

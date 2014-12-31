@@ -1,9 +1,6 @@
 
 # TODO
-- [ ] support symlinks
-- [ ] ditch (most of) sync-api
-- [ ] use opts in sync-api, too
-- [ ] use async stuf everywhere else
+- [ ] use async fs stuff everywhere
 - [ ] archive.stat & ltstat & (...sync)
 - [ ] original asar: test (and fix) extracting empty files
 - [ ] default:dont-overwrite, honor --overwrite flag
