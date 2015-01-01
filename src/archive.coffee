@@ -298,6 +298,7 @@ module.exports = class AsarArchive
 			json = @_header
 		else
 			json = @_searchNode archiveRoot, no
+			throw new Error "#{archiveRoot} not found in #{@_archiveName}" unless json?
 			files.push archiveRoot if json.size
 			archiveRoot = "#{path.sep}#{archiveRoot}"
 
