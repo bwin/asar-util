@@ -83,6 +83,13 @@ describe 'cli:', ->
 			return
 		return
 
+	it 'should verify an archive', (done) ->
+		proc = exec "node bin/asar-util -i test/input/extractthis.asar --verify"
+		proc.on 'exit', (code) ->
+			done assert.ok code is 0
+			return
+		return
+
 	describe 'archive node_modules:', ->
 		src =  'node_modules/'
 		archiveFilename = 'tmp/modules-cli.asar'

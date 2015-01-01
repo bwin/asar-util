@@ -24,8 +24,8 @@ loadArchive = (archiveFilename) ->
 	archive.openSync archiveFilename
 	return archive
 
-verifyArchive = (cb) ->
-	loadArchive(archiveFilename).archive.verify cb
+verifyArchive = (archiveFilename, cb) ->
+	loadArchive(archiveFilename).verify cb
 	return
 
 # retrieves a list of entries (dirs, files) in archive:/archiveRoot
@@ -33,8 +33,8 @@ getEntries = (archiveFilename, archiveRoot='/', pattern=null)->
 	return loadArchive(archiveFilename).getEntries archiveRoot, pattern
 
 # extract archive:/archiveRoot
-extractArchiveSync = (archiveFilename, destDir, archiveRoot='/', pattern=null) ->
-	return loadArchive(archiveFilename).extractSync destDir, archiveRoot, pattern
+#extractArchiveSync = (archiveFilename, destDir, archiveRoot='/', pattern=null) ->
+#	return loadArchive(archiveFilename).extractSync destDir, archiveRoot, pattern
 
 # extract archive:/archiveRoot
 extractArchive = (archiveFilename, destDir, opts, cb) ->
@@ -50,7 +50,7 @@ module.exports = {
 	loadArchive
 	verifyArchive
 	getEntries
-	extractArchiveSync
+	#extractArchiveSync
 	extractArchive
 	createReadStream
 	opts

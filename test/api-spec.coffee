@@ -73,6 +73,11 @@ describe 'api:', ->
 			compDirs extractTo, 'test/expected/extractthis-dir2', done
 		return
 
+	it 'should verify an archive', (done) ->
+		asar.verifyArchive 'test/input/extractthis.asar', (err, ok) ->
+			done assert.ok ok
+		return
+
 	describe 'archive node_modules:', ->
 		src = 'node_modules/'
 		archiveFilename = 'tmp/modules-api.asar'
