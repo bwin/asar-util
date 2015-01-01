@@ -14,10 +14,18 @@ describe 'cli:', ->
 	@timeout 1000*60 * 1 # minutes
 
 	it 'should create archive from directory', (done) ->
-		packTo = 'tmp/packthis-cli.asar'
-		exec "node bin/asar-util -i test/input/packthis/ -o #{packTo}", (err, stdout, stderr) ->
-			actual = fs.readFileSync packTo, 'utf8'
+		archiveName = 'tmp/packthis-cli.asar'
+		exec "node bin/asar-util -i test/input/packthis/ -o #{archiveName}", (err, stdout, stderr) ->
+			actual = fs.readFileSync archiveName, 'utf8'
 			expected = fs.readFileSync 'test/expected/packthis.asar', 'utf8'
+			return done assert.equal actual, expected
+		return
+
+	it 'should append a directory to archive', (done) ->
+		archiveName = 'tmp/packthis-cli.asar'
+		exec "node bin/asar-util -i #{archiveName} -a test/input/addthis", (err, stdout, stderr) ->
+			actual = fs.readFileSync archiveName, 'utf8'
+			expected = fs.readFileSync 'test/expected/packthis-appended.asar', 'utf8'
 			return done assert.equal actual, expected
 		return
 

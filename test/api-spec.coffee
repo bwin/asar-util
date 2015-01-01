@@ -20,6 +20,19 @@ describe 'api:', ->
 			return done assert.equal actual, expected
 		return
 
+	it 'should append a directory to archive', (done) ->
+		appendDir = 'test/input/addthis'
+		archiveName = 'tmp/packthis-api.asar'
+		archive = asar.loadArchive archiveName
+		archive.addDirectory appendDir, appendDir, {}, (err) ->
+			return done err if err
+			archive.write archiveName, ->
+				actual = fs.readFileSync archiveName, 'utf8'
+				expected = fs.readFileSync 'test/expected/packthis-appended.asar', 'utf8'
+				return done assert.equal actual, expected
+			return
+		return
+
 	it 'should list files/dirs in archive', ->
 		archive = asar.loadArchive 'test/input/extractthis.asar'
 		actual = archive.getEntries().join '\n'
@@ -128,8 +141,6 @@ describe 'api (old format, read-only):', ->
 		if os.platform() is 'win32'
 			expected = expected.replace(/\//g, '\\').replace(/\r\n/g, '\n')
 		return assert.equal actual, expected
-
-
 
 	it 'should stream a text file from archive', (done) ->
 		actual = asar.createReadStream 'test/input/extractthis-oldformat.asar', 'dir1/file1.txt'

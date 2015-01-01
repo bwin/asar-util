@@ -1,5 +1,6 @@
 
 # TODO
+- [ ] refactor addSymlink, addDirectory etc.
 - [ ] use async fs stuff everywhere
 - [ ] archive.stat & ltstat & (...sync)
 - [ ] original asar: test (and fix) extracting empty files
@@ -22,17 +23,3 @@
 - [ ] put crawlFilesystem in exports or as separate npm module ?
 - [ ] option to use short header keys (v, _, s, o, l) (expandHeaderKeys if header.v) ?
 - [ ] 
-
-
-class AsarArchiveFileReadStream extends stream.Transform
-	constructor: (opts) ->
-		#unless @ instanceOf AsarArchiveFileReadStream
-		#	return new AsarArchiveFileReadStream opts
-
-		#Transform.call @, opts
-		super opts
-
-	_transform: (chunk, enc, cb) ->
-		buffer = if Buffer.isBuffer chunk then chunk else new Buffer chunk, enc
-		@push buffer
-		cb()

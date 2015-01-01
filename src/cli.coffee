@@ -64,6 +64,7 @@ showVersion = argv.version or argv.v
 showExamples = argv.examples
 input = argv.i or argv.in or argv._[0]
 output = argv.o or argv.out or argv._[1]
+appendDir = argv.a or argv.add
 root = argv.r or argv.root
 pattern = argv.p or argv.pattern
 doOverwrite = argv.w or argv.overwrite
@@ -170,6 +171,16 @@ else if input
 			else
 				generalError 'wrong checksum'
 
+	else if appendDir
+		# append directory to archive
+		usageError 'output and --add not allowed together' if output
+		console.log "adding #{(appendDir + (pattern or '')).info} to #{input.info}" if verbose
+		archive = asar.loadArchive input
+		archive.addDirectory appendDir, appendDir,
+			pattern: pattern
+		, (err) ->
+			return done err if err
+			archive.write input, done
 
 	else if output
 		# transcode in -> out

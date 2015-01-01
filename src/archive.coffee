@@ -37,6 +37,7 @@ module.exports = class AsarArchive
 		@_files = []
 		@_fileNodes = []
 		@_archiveName = null
+		@_dirty = no
 		@_checksum = null
 		@_legacyMode = no
 		return
@@ -204,6 +205,11 @@ module.exports = class AsarArchive
 
 	# saves an asar archive to disk
 	write: (archiveName, opts, cb) ->
+		# make opts optional
+		if typeof opts is 'function'
+			cb = opts
+			opts = {}
+		appendMode = @_archiveName is archiveName
 		@_archiveName = archiveName
 
 		# create output dir if necessary
@@ -237,17 +243,29 @@ module.exports = class AsarArchive
 					return
 				src.pipe out, end: no
 			return
-		
-		out = fs.createWriteStream archiveName
-		@_writeHeader out, =>
+
+		writeArchive = (err, cb) =>
+			return cb? err if err
 			q = queue 1
 			for file, i in @_files
 				q.defer writeFile, file, out, @_fileNodes[i]
-				q.awaitAll (err) =>
-					return cb? err if err
-					@_writeFooter out, cb
-					
+			q.awaitAll (err) =>
+				return cb? err if err
+				@_writeFooter out, (err) ->
+					return cb err if err
+					@_dirty = no
+					@_files = []
+					@_fileNodes = []
+					cb()
 			return
+		
+		start = if appendMode then @_offset else 0
+		if appendMode
+			out = fs.createWriteStream archiveName, flags: 'r+', start: start
+			writeArchive null, cb
+		else
+			out = fs.createWriteStream archiveName
+			@_writeHeader out, (err) -> writeArchive err, cb
 		return
 
 	verify: (cb) ->
@@ -290,10 +308,10 @@ module.exports = class AsarArchive
 
 		return files
 
-	# shouldn't be public
-	#getMetadata: (filename) ->
-	#	node = @_searchNode filename, no
-	#	return node
+	# shouldn't be public (but it for now because of cli -ls)
+	getMetadata: (filename) ->
+		node = @_searchNode filename, no
+		return node
 
 	# !!! ...
 	createReadStream: (filename) ->
@@ -389,6 +407,7 @@ module.exports = class AsarArchive
 	# also adds parent directories (without their files)
 	# if content is not set, the file is read from disk (on this.write)
 	addFile: (filename, relativeTo, stat=null, content=null) ->
+		@_dirty = yes
 		stat ?= fs.lstatSyc filename
 
 		# JavaScript can not precisely present integers >= UINT32_MAX.
@@ -417,6 +436,7 @@ module.exports = class AsarArchive
 	# adds a single file to archive
 	# also adds parent directories (without their files)
 	addSymlink: (filename, relativeTo, stat=null) ->
+		@_dirty = yes
 		p = path.relative relativeTo, filename
 		pDir = path.dirname path.join relativeTo, p
 		pAbsDir = path.resolve pDir
@@ -432,6 +452,7 @@ module.exports = class AsarArchive
 
 	# creates an empty directory in the archive
 	createDirectory: (dirname) ->
+		@_dirty = yes
 		entry = @_searchNode dirname
 		entry.files = {}
 		return
@@ -439,10 +460,11 @@ module.exports = class AsarArchive
 	# adds a directory and it's files to archive
 	# also adds parent directories (but without their files)
 	addDirectory: (dirname, relativeTo, opts, cb) ->
+		@_dirty = yes
 		if typeof opts is 'function'
 			cb = opts
 			opts = {}
-		@_crawlFilesystem dirname, opts.pattern, (err, files) =>
+		@_crawlFilesystem dirname, opts?.pattern, (err, files) =>
 			for file in files
 				console.log "+ #{path.sep}#{path.relative relativeTo, file.name}" if @opts.verbose
 				if file.stat.isDirectory()
