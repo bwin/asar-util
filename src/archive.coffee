@@ -458,12 +458,12 @@ module.exports = class AsarArchive
 	createDirectory: (dirname) ->
 		@_dirty = yes
 		entry = @_searchNode dirname
-		entry.files = {}
+		entry.files ?= {}
 		return
 
 	# adds a directory and it's files to archive
 	# also adds parent directories (but without their files)
-	addDirectory: (dirname, opts, cb) ->
+	addDirectory: (dirname, opts={}, cb=null) ->
 		@_dirty = yes
 		if typeof opts is 'function'
 			cb = opts
