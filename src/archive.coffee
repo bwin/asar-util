@@ -282,7 +282,6 @@ module.exports = class AsarArchive
 			return
 		return
 
-
 	# retrieves a list of all entries (dirs, files) in archive
 	getEntries: (archiveRoot='/', pattern=null)->
 		archiveRoot = archiveRoot.substr 1 if archiveRoot.length > 1 and archiveRoot[0] in '/\\'.split '' # get rid of leading slash
@@ -348,7 +347,7 @@ module.exports = class AsarArchive
 		# init default opts
 		archiveRoot = opts.root or '/'
 		pattern = opts.pattern
-		symlinksSupported = os.platform() is 'win32'
+		symlinksSupported = os.platform() isnt 'win32'
 
 		filenames = @getEntries archiveRoot, pattern
 		if filenames.length is 1
@@ -393,7 +392,7 @@ module.exports = class AsarArchive
 					try fs.unlinkSync destFilename
 					fs.symlinkSync linkToRel, destFilename
 				else
-					console.log 'Warning: extracting symlinks on windows not yet supported'
+					console.log "Warning: extracting symlinks on windows not yet supported. Skipping #{destFilename}" if @opts.verbose
 					# TODO
 			else
 				destDir = path.dirname destFilename
