@@ -24,7 +24,7 @@ describe 'api:', ->
 		appendDir = 'test/input/addthis'
 		archiveName = 'tmp/packthis-api.asar'
 		archive = asar.loadArchive archiveName
-		archive.addDirectory appendDir, appendDir, {}, (err) ->
+		archive.addDirectory appendDir, (err) ->
 			return done err if err
 			archive.write archiveName, ->
 				actual = fs.readFileSync archiveName, 'utf8'

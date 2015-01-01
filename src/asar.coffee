@@ -12,9 +12,9 @@ createArchive = (srcDir, archiveFilename, pattern, cb) ->
 		pattern = null
 	archive = new AsarArchive opts
 	if srcDir?
-		archive.addDirectory srcDir, srcDir, {pattern}, (err) ->
+		archive.addDirectory srcDir, {pattern}, (err) ->
 			if archiveFilename?
-				archive.write archiveFilename, {}, (err) ->
+				archive.write archiveFilename, (err) ->
 					return cb err, archive
 	return
 

@@ -176,7 +176,7 @@ else if input
 		usageError 'output and --add not allowed together' if output
 		console.log "adding #{(appendDir + (pattern or '')).info} to #{input.info}" if verbose
 		archive = asar.loadArchive input
-		archive.addDirectory appendDir, appendDir,
+		archive.addDirectory appendDir,
 			pattern: pattern
 		, (err) ->
 			return done err if err

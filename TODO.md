@@ -1,6 +1,5 @@
 
 # TODO
-- [ ] refactor addSymlink, addDirectory etc.
 - [ ] use async fs stuff everywhere
 - [ ] archive.stat & ltstat & (...sync)
 - [ ] original asar: test (and fix) extracting empty files

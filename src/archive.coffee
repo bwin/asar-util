@@ -406,9 +406,11 @@ module.exports = class AsarArchive
 	# adds a single file to archive
 	# also adds parent directories (without their files)
 	# if content is not set, the file is read from disk (on this.write)
-	addFile: (filename, relativeTo, stat=null, content=null) ->
+	addFile: (filename, opts={}) ->
+		stat = opts.stat or fs.lstatSyc filename
+		relativeTo = opts.relativeTo or path.dirname filename
+		
 		@_dirty = yes
-		stat ?= fs.lstatSyc filename
 
 		# JavaScript can not precisely present integers >= UINT32_MAX.
 		if stat.size > 4294967295
@@ -435,8 +437,11 @@ module.exports = class AsarArchive
 
 	# adds a single file to archive
 	# also adds parent directories (without their files)
-	addSymlink: (filename, relativeTo, stat=null) ->
+	addSymlink: (filename, opts={}) ->
+		relativeTo = opts.relativeTo or path.dirname filename
+		
 		@_dirty = yes
+		
 		p = path.relative relativeTo, filename
 		pDir = path.dirname path.join relativeTo, p
 		pAbsDir = path.resolve pDir
@@ -459,20 +464,23 @@ module.exports = class AsarArchive
 
 	# adds a directory and it's files to archive
 	# also adds parent directories (but without their files)
-	addDirectory: (dirname, relativeTo, opts, cb) ->
+	addDirectory: (dirname, opts, cb) ->
 		@_dirty = yes
 		if typeof opts is 'function'
 			cb = opts
 			opts = {}
+		relativeTo = opts.relativeTo or dirname
 		@_crawlFilesystem dirname, opts?.pattern, (err, files) =>
 			for file in files
 				console.log "+ #{path.sep}#{path.relative relativeTo, file.name}" if @opts.verbose
 				if file.stat.isDirectory()
 					@createDirectory path.relative relativeTo, file.name
-				else if file.stat.isFile() #or file.stat.isSymbolicLink()
-					@addFile file.name, relativeTo, file.stat
+				else if file.stat.isFile()
+					@addFile file.name,
+						relativeTo: relativeTo
+						stat: file.stat
 				else if file.stat.isSymbolicLink()
-					@addSymlink file.name, relativeTo, file.stat
+					@addSymlink file.name, relativeTo: relativeTo
 			return cb? null
 		return
 
