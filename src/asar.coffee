@@ -1,5 +1,6 @@
 
 AsarArchive = require './archive'
+serialization = require './serialization'
 
 opts = {}
 
@@ -21,8 +22,7 @@ createArchive = (srcDir, archiveFilename, pattern, cb) ->
 # load an archive from disk
 loadArchive = (archiveFilename) ->
 	archive = new AsarArchive opts
-	archive.openSync archiveFilename
-	return archive
+	return serialization.loadArchive archive, archiveFilename
 
 verifyArchive = (archiveFilename, cb) ->
 	loadArchive(archiveFilename).verify cb
