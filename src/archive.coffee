@@ -5,11 +5,30 @@ path = require 'path'
 crypto = require 'crypto'
 stream = require 'stream'
 zlib = require 'zlib'
+UINT64 = require('cuint').UINT64
 
 walkdir = require 'walkdir'
 minimatch = require 'minimatch'
 mkdirp = require 'mkdirp'
 queue = require 'queue-async'
+
+MAX_SAFE_INTEGER = 9007199254740992
+
+writeUINT64 = (buf, val, ofs=0) ->
+	uintval = UINT64 val
+	buf.writeUInt16LE uintval._a00, ofs + 0
+	buf.writeUInt16LE uintval._a16, ofs + 2
+	buf.writeUInt16LE uintval._a32, ofs + 4
+	buf.writeUInt16LE uintval._a48, ofs + 6
+	#console.log "UINT64-conv-write:", val, buf
+	return buf
+
+readUINT64 = (buf, ofs=0) ->
+	lo = buf.readUInt32LE ofs + 0
+	hi = buf.readUInt32LE ofs + 4
+	val = UINT64(lo, hi).toNumber()
+	#console.log "UINT64-conv-read:", val, buf
+	return val
 
 sortBy = (prop) -> (a, b) ->
 	return -1 if a[prop] < b[prop]
@@ -19,6 +38,7 @@ sortBy = (prop) -> (a, b) ->
 module.exports = class AsarArchive
 	MAGIC: 'ASAR\r\n'
 	VERSION: 1
+	SIZELENGTH: 64 / 8
 
 	constructor: (@opts={}) ->
 		# default options
@@ -32,7 +52,7 @@ module.exports = class AsarArchive
 			version: @VERSION
 			files: {}
 		@_headerSize = 0
-		@_offset = @MAGIC.length #0
+		@_offset = @MAGIC.length
 		@_archiveSize = 0
 		@_files = []
 		@_fileNodes = []
@@ -70,14 +90,13 @@ module.exports = class AsarArchive
 			#console.warn 'Deprecation notice: old version of asar archive.'
 			return @_readHeaderOld fd
 
-		sizeBufSize = 4
-		headerSizeOfs = @_archiveSize - (4 + 16 + 4) # headerSize, checksum, archiveSize
-		headerSizeBuf = new Buffer sizeBufSize
-		if fs.readSync(fd, headerSizeBuf, 0, sizeBufSize, headerSizeOfs) isnt sizeBufSize
+		headerSizeOfs = @_archiveSize - (@SIZELENGTH + 16 + @SIZELENGTH) # headerSize, checksum, archiveSize
+		headerSizeBuf = new Buffer @SIZELENGTH
+		if fs.readSync(fd, headerSizeBuf, 0, @SIZELENGTH, headerSizeOfs) isnt @SIZELENGTH
 			throw new Error "Unable to read header size: #{@_archiveName}"
-		headerSize = headerSizeBuf.readUInt32LE 0
+		headerSize = readUINT64 headerSizeBuf
 
-		headerOfs = @_archiveSize - headerSize - (4 + 16 + 4) # headerSize, checksum, archiveSize
+		headerOfs = @_archiveSize - headerSize - (@SIZELENGTH + 16 + @SIZELENGTH) # headerSize, checksum, archiveSize
 		headerBuf = new Buffer headerSize
 		if fs.readSync(fd, headerBuf, 0, headerSize, headerOfs) isnt headerSize
 			throw new Error "Unable to read header: #{@_archiveName}"
@@ -85,7 +104,7 @@ module.exports = class AsarArchive
 		@_offset = headerOfs
 
 		checksumSize = 16
-		checksumOfs = @_archiveSize - 16 - 4 # checksum, archiveSize
+		checksumOfs = @_archiveSize - 16 - @SIZELENGTH # checksum, archiveSize
 		@_checksum = new Buffer checksumSize
 		if fs.readSync(fd, @_checksum, 0, checksumSize, checksumOfs) isnt checksumSize
 			throw new Error "Unable to read checksum: #{@_archiveName}"
@@ -106,12 +125,6 @@ module.exports = class AsarArchive
 			throw new Error 'Unable to read header size (assumed old format)'
 		size = sizeBuf.readUInt32LE 4
 
-		#if fs.readSync(fd, sizeBuf, 0, sizeBufSize, 8) isnt sizeBufSize
-		#	throw new Error 'Unable to read header something between size and json-header (assumed old format)'
-		#console.log "s=", size
-		#console.log "s1=", sizeBuf.readUInt32LE 0
-		#console.log "s2=", sizeBuf.readUInt32LE 4
-
 		actualSize = size - 8
 		headerBuf = new Buffer actualSize
 		if fs.readSync(fd, headerBuf, 0, actualSize, 16) isnt actualSize
@@ -122,7 +135,6 @@ module.exports = class AsarArchive
 			headerStr = headerBuf.toString().replace /\0+$/g, ''
 			@_header = JSON.parse headerStr
 		catch err
-			#console.log "header:'#{x}'",err
 			throw new Error 'Unable to parse header (assumed old format)'
 		@_headerSize = size
 		return
@@ -139,8 +151,8 @@ module.exports = class AsarArchive
 			headerStr = JSON.stringify @_header
 
 		@_headerSize = headerStr.length
-		headerSizeBuf = new Buffer 4
-		headerSizeBuf.writeUInt32LE @_headerSize, 0
+		headerSizeBuf = new Buffer @SIZELENGTH
+		writeUINT64 headerSizeBuf, @_headerSize
 		
 		out.write headerStr, =>
 			out.write headerSizeBuf, =>
@@ -151,11 +163,11 @@ module.exports = class AsarArchive
 				#md5.on 'finish', =>
 					# is this really ok ???
 					@_checksum = md5.read()
-					@_archiveSize = 4 + @_offset + @_headerSize + 4 + 16 + 4  
-					if @_archiveSize > 4294967295 # because of js precision limit
-						return cb? new Error "archive size can not be larger than 4.2GB"
-					archiveSizeBuf = new Buffer 4
-					archiveSizeBuf.writeUInt32LE @_archiveSize, 0
+					@_archiveSize = @_offset + @_headerSize + @SIZELENGTH + 16 + @SIZELENGTH  
+					if @_archiveSize > MAX_SAFE_INTEGER
+						return cb? new Error "archive size can not be larger than 9PB"
+					archiveSizeBuf = new Buffer @SIZELENGTH
+					writeUINT64 archiveSizeBuf, @_archiveSize
 
 					out.write @_checksum, ->
 						out.write archiveSizeBuf, cb
@@ -269,7 +281,7 @@ module.exports = class AsarArchive
 		return
 
 	verify: (cb) ->
-		endOfs = @_offset + @_headerSize + 4 - 1
+		endOfs = @_offset + @_headerSize + @SIZELENGTH - 1
 		archiveFile = fs.createReadStream @_archiveName,
 			start: 0
 			end: endOfs
@@ -413,13 +425,8 @@ module.exports = class AsarArchive
 		@_dirty = yes
 
 		# JavaScript can not precisely present integers >= UINT32_MAX.
-		if stat.size > 4294967295
-			throw new Error "#{p}: file size can not be larger than 4.2GB"
-
-		# this is only approximate
-		# we dont take into account the size of the header
-		#if @_offset + stat.size > 4294967295
-		#	throw new Error "#{p}: archive size can not be larger than 4.2GB"
+		if stat.size > MAX_SAFE_INTEGER
+			throw new Error "#{p}: file size can not be larger than 9PB"
 
 		p = path.relative relativeTo, filename
 		node = @_searchNode p
