@@ -1,5 +1,7 @@
 
 # TODO
+- [ ] add --info command:
+archive size, dirs, files, links, compsize, decompsize, checksum
 - [ ] use async fs stuff everywhere
 - [ ] archive.stat & ltstat & (...sync)
 - [ ] original asar: test (and fix) extracting empty files

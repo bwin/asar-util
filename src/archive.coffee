@@ -55,6 +55,7 @@ module.exports = class AsarArchive
 		@_offset = @MAGIC.length
 		@_archiveSize = 0
 		@_files = []
+		@_filesInternalName = []
 		@_fileNodes = []
 		@_archiveName = null
 		@_dirty = no
@@ -222,13 +223,16 @@ module.exports = class AsarArchive
 		if typeof opts is 'function'
 			cb = opts
 			opts = {}
+		#console.log "writing #{archiveName} ..." if @opts.verbose
 		appendMode = @_archiveName is archiveName
 		@_archiveName = archiveName
 
 		# create output dir if necessary
 		mkdirp.sync path.dirname archiveName
 
-		writeFile = (filename, out, node, cb) =>
+		writeFile = (filename, out, internalFilename, node, cb) =>
+			console.log "+ #{path.sep}#{internalFilename}" if @opts.verbose
+
 			realSize = 0
 			src = fs.createReadStream filename
 			
@@ -261,13 +265,14 @@ module.exports = class AsarArchive
 			return cb? err if err
 			q = queue 1
 			for file, i in @_files
-				q.defer writeFile, file, out, @_fileNodes[i]
+				q.defer writeFile, file, out, @_filesInternalName[i], @_fileNodes[i]
 			q.awaitAll (err) =>
 				return cb? err if err
 				@_writeFooter out, (err) ->
 					return cb err if err
 					@_dirty = no
 					@_files = []
+					@_filesInternalName = []
 					@_fileNodes = []
 					cb()
 			return
@@ -372,6 +377,7 @@ module.exports = class AsarArchive
 		relativeTo = relativeTo[...-1] if relativeTo[-1..] in '/\\'.split ''
 
 		writeStreamToFile = (filename, destFilename, cb) =>
+			console.log "-> #{destFilename}" if @opts.verbose
 			inStream = @createReadStream filename
 
 			out = fs.createWriteStream destFilename
@@ -386,8 +392,6 @@ module.exports = class AsarArchive
 			destFilename = filename
 			destFilename = destFilename.replace relativeTo, '' if relativeTo isnt '.'
 			destFilename = path.join dest, destFilename
-			#console.log "#{filename} -> #{destFilename}" if @opts.verbose
-			console.log "-> #{destFilename}" if @opts.verbose
 
 			node = @_searchNode filename, no
 			if node.files
@@ -435,6 +439,7 @@ module.exports = class AsarArchive
 		return if node.size is 0
 
 		@_files.push filename
+		@_filesInternalName.push p
 		@_fileNodes.push node
 		
 		if process.platform is 'win32' and stat.mode & 0o0100
@@ -478,7 +483,7 @@ module.exports = class AsarArchive
 		relativeTo = opts.relativeTo or dirname
 		@_crawlFilesystem dirname, opts?.pattern, (err, files) =>
 			for file in files
-				console.log "+ #{path.sep}#{path.relative relativeTo, file.name}" if @opts.verbose
+				#console.log "+ #{path.sep}#{path.relative relativeTo, file.name}" if @opts.verbose
 				if file.stat.isDirectory()
 					@createDirectory path.relative relativeTo, file.name
 				else if file.stat.isFile()
