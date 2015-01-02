@@ -396,7 +396,7 @@ module.exports = class AsarArchive
 			else if node.link
 				if symlinksSupported
 					destDir = path.dirname destFilename
-					q.defer mkdirp, destDir
+					mkdirp.sync destDir
 
 					linkTo = path.join destDir, relativeTo, node.link
 					linkToRel = path.relative path.dirname(destFilename), linkTo
