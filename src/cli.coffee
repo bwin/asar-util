@@ -165,6 +165,7 @@ else if input
 			archive = asar.loadArchive input
 		catch err
 			generalError err.message
+		console.log "verifying #{input.info}" if verbose
 		archive.verify (err, ok) ->
 			if ok
 				done()
