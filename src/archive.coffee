@@ -67,6 +67,7 @@ module.exports = class AsarArchive
 		#! console.log "_searchNode", p
 		name = path.basename p
 		node = @_header
+		return node if p is ''
 		dirs = path.dirname(p).split path.sep
 		for dir in dirs
 			throw new Error "#{p} not found." unless node?
@@ -281,6 +282,7 @@ module.exports = class AsarArchive
 		return
 
 	verify: (cb) ->
+		# TODO also check file size
 		endOfs = @_offset + @_headerSize + @SIZELENGTH - 1
 		archiveFile = fs.createReadStream @_archiveName,
 			start: 0
@@ -298,23 +300,20 @@ module.exports = class AsarArchive
 	getEntries: (archiveRoot='/', pattern=null)->
 		archiveRoot = archiveRoot.substr 1 if archiveRoot.length > 1 and archiveRoot[0] in '/\\'.split '' # get rid of leading slash
 		files = []
-		fillFilesFromHeader = (p, json) ->
-			return unless json?.files?
-			for f of json.files
+		fillFilesFromHeader = (p, node) ->
+			return unless node?.files?
+			for f of node.files
 				fullPath = path.join p, f
 				files.push fullPath
-				fillFilesFromHeader fullPath, json.files[f]
+				fillFilesFromHeader fullPath, node.files[f]
 			return
 
-		if archiveRoot is '/'
-			json = @_header
-		else
-			json = @_searchNode archiveRoot, no
-			throw new Error "#{archiveRoot} not found in #{@_archiveName}" unless json?
-			files.push archiveRoot if json.size
-			archiveRoot = "#{path.sep}#{archiveRoot}"
+		node = @_searchNode archiveRoot, no
+		throw new Error "#{archiveRoot} not found in #{@_archiveName}" unless node?
+		files.push archiveRoot if node.size
+		archiveRoot = "#{path.sep}#{archiveRoot}"
 
-		fillFilesFromHeader archiveRoot, json
+		fillFilesFromHeader archiveRoot, node
 
 		files = files.filter minimatch.filter pattern, matchBase: yes if pattern
 
