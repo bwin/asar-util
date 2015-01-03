@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+  <head>
+    <style>
+      .info {
+        padding: 5px 5px 0;
+        font-size: 10px;
+      }
+      .block {
+        padding: 5px;
+      }
+      .magic {
+        background-color: #1abc9c;
+      }
+      .payload {
+        background-color: #2c3e50;
+        color: white;
+      }
+      .payload:nth-of-type(2n+1) {
+        background-color: #34495e;
+      }
+      .header {
+        background-color: #c0392b;
+        white-space: pre-wrap;
+      }
+      .header-size {
+        background-color: #f1c40f;
+      }
+      .checksum {
+        background-color: #8e44ad;
+      }
+      .archive-size {
+        background-color: #f39c12;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Asar format</h2>
+    <div class="info">MAGIC:</div>
+    <div class="block magic">ASAR\r\n</div>
+    <div class="info">PAYLOAD:</div>
+    <div class="block payload">file1 content</div>
+    <div class="block payload">file2 content</div>
+    <div class="block payload">file3 content</div>
+    <div class="block payload">file4 content</div>
+    <div class="block payload">file5 content</div>
+    <div class="info">HEADER:</div>
+    <div class="block header">{
+  "version": 1,
+  "files": {
+    "file1.txt": {"size": 13, "offset": 6},
+    "dir1": {
+      "files": {
+        "file2.txt": {"size": 13, "offset": 19},
+        "file3.txt": {"size": 13, "offset": 32}
+      }
+    },
+    "dir2": {
+      "file4.txt": {"size": 13, "offset": 45},
+      "file5.txt": {"size": 13, "offset": 58}
+    }
+  }
+}</div>
+    <div class="info">HEADER-SIZE:</div>
+    <div class="block header-size">UINT64 (8 byte)</div>
+    <div class="info">CHECKSUM:</div>
+    <div class="block checksum">MD5 (16 byte)</div>
+    <div class="info">ARCHIVE-SIZE:</div>
+    <div class="block archive-size">UINT64 (8 byte)</div>
+  <body>
+</html>
