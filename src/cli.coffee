@@ -10,7 +10,7 @@ pkg = require '../package'
 
 argv = minimist process.argv.slice(2),
 	string: '_ i in o out a add r root'.split ' '
-	boolean: 'h help v version examples w overwrite z compress P pretty l list s size verify c colors C compat Q verbose debug q quiet'.split ' '
+	boolean: 'h help v version examples w overwrite z compress P pretty l list s size verify info c colors C compat Q verbose debug q quiet'.split ' '
 	default:
 		root: '/'
 
@@ -26,16 +26,17 @@ or if you prefer, you can set these with:
 Options:
 -h, --help            show help and exit
 -v, --version         show version and exit
-    --examples        show example usage
+    --examples        show example usage and exit
+    --verify          verify archive integrity and exit
+    --info            output archive info and exit
+-l, --list            list archive entries and exit
+-s, --size            also list size
 -a, --add <path>      path to directory to add to archive
 -r, --root <path>     set root path in archive
 -p, --pattern <glob>  set a filter pattern
 -w, --overwrite       overwrite files
 -z, --compress        gzip file contents
 -P, --pretty          write pretty printed json TOC
--l, --list            list archive entries
--s, --size            also list size
-    --verify          verify archive integrity
 -c, --colors          use terminal colors for output
 -C, --compat          also read legacy asar format
 -Q, --verbose         more feedback
@@ -116,6 +117,16 @@ if debug
 asar.opts.compress = yes if doCompress
 asar.opts.prettyToc = yes if prettyPrint
 
+inputPath = []
+inputPath.push '.'
+if root in ['/', '\\']
+	inputPath.push input
+else
+	inputPath.push "#{input}:"
+	inputPath.push root
+inputPath.push pattern if pattern
+inputPath = path.join.apply(null, inputPath).info
+
 # show usage info (explicit)
 if showHelp
 	help()
@@ -130,36 +141,7 @@ else if showVersion
 
 # we have at least an input
 else if input
-	if showList
-		usageError 'output and --list not allowed together' if output
-		usageError 'output and --verify not allowed together' if verify
-		usageError 'Y U mix --list and --quiet ?! makes no sense' if quiet
-		console.log "listing #{input}:#{root}" if verbose
-		if showListSize
-			# list archive content with size
-			try
-				archive = asar.loadArchive input
-				entries = archive.getEntries root, pattern
-			catch err
-				generalError err.message
-			for entry in entries
-				metadata = archive.getMetadata entry
-				line = entry
-				line += path.sep if metadata.files?
-				line += "\t#{metadata.size}" if metadata.size?
-				console.log line
-		else
-			# list archive content
-			try
-				entries = asar.getEntries input, root, pattern
-			catch err
-				generalError err.message
-			console.log entries.join os.EOL
-		#done()
-
-	else if showListSize then usageError '--size can only be used with --list'
-
-	else if verify
+	if verify
 		usageError 'output and --verify not allowed together' if output
 		try
 			archive = asar.loadArchive input
@@ -192,18 +174,50 @@ else if input
 
 		if inputStat.isDirectory()
 			# create archive
-			console.log "packing #{(input + (pattern or '')).info} to #{output.info}" if verbose
+			console.log "packing #{inputPath} to #{output.info}" if verbose
 			asar.createArchive input, output, pattern, done
 		else
 			# extract archive
-			console.log "extracting #{(input + root + (pattern or '')).info} to #{output.info}" if verbose
+			console.log "extracting #{inputPath} to #{output.info}" if verbose
 			asar.extractArchive input, output,
 				root: root
 				pattern: pattern
 			, done
 
+	else #if showList
+		#usageError 'output and --list not allowed together' if output
+		#usageError 'output and --verify not allowed together' if verify
+		#usageError 'Y U mix --list and --quiet ?! makes no sense' if quiet
+		#usageError '--size can only be used with --list' if showListSize and not showList
+
+		console.log "listing #{inputPath}" if verbose
+		if showListSize
+			# list archive content with size
+			try
+				archive = asar.loadArchive input
+				entries = archive.getEntries root, pattern
+			catch err
+				generalError err.message
+			for entry in entries
+				metadata = archive.getMetadata entry
+				line = entry
+				line += path.sep if metadata.files?
+				line += "\t#{metadata.size}" if metadata.size?
+				#line += "\t-> #{metadata.link}" if metadata.link?
+				console.log line
+		else
+			# list archive content
+			try
+				entries = asar.getEntries input, root, pattern
+			catch err
+				generalError err.message
+			console.log entries.join os.EOL
+		#done()
+
+	#else if showListSize then usageError '--size can only be used with --list'
+
 	# input but nothing else
-	else usageError 'not enough arguments'
+	#else usageError 'not enough arguments'
 
 # show usage info (implicit)
 else usageError 'no input specified'
