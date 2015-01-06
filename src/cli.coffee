@@ -4,6 +4,8 @@ os = require 'os'
 path = require 'path'
 
 minimist = require 'minimist'
+Progress = require 'progress'
+nodeFilesize = require 'filesize'
 
 asar = require './asar'
 pkg = require '../package'
@@ -104,16 +106,100 @@ generalError = (msg) ->
 
 done = (err) ->
 	generalError err.message if err
+	onProgress? bar.total, bar.total, 'done.'
 	console.log "ok.".success unless quiet
 	process.exit 0
 
 
+truncatePath = (filename, maxLenght=0) ->
+	return filename if maxLenght is 0
+
+	truncated = no
+	result = filename
+	results = result.split /[\\\/]+/g
+	while results.length > 1 and result.length + 3 > maxLenght
+		truncated = yes
+		results = result.split /[\\\/]+/g
+		last = results.pop()
+		results.pop()
+		results.push last
+		result = results.join path.sep
+	if result.length + 3 > maxLenght
+		len = result.length + 3
+		result = '...' + result.substr len - maxLenght
+		return result
+	if truncated
+		results = result.split /[\\\/]+/g
+		last = results.pop()
+		results.push '...'
+		results.push last
+		result = results.join path.sep
+	return result
+
+throttle = (fn, threshhold, scope) ->
+	threshhold or (threshhold = 250)
+	last = undefined
+	deferTimer = undefined
+	return ->
+		context = scope or @
+		now = +new Date
+		args = arguments
+		if last and now < last + threshhold
+			
+			# hold on to it
+			clearTimeout deferTimer
+			deferTimer = setTimeout(->
+				last = now
+				fn.apply context, args
+				return
+			, threshhold)
+		else
+			last = now
+			fn.apply context, args
+		return
+
+niceSize = (size) ->
+	result = nodeFilesize size,	output: 'object'
+	return "#{result.value.toFixed 2}#{result.suffix}"
+
+unless quiet
+	bar = new Progress ':bar :percent :mbWritten/:mbTotal :filename',
+		total: 0
+		width: 20
+		incomplete: '▒'
+		complete: '█'
+
+	onProgress = (total, progress, filename) ->
+		bar.total = total
+		bar.tick 0,
+			filename: truncatePath filename, 30
+			mbWritten: niceSize bar.curr#(bar.curr / 1024 / 1024).toFixed 1
+			mbTotal: niceSize bar.total#(bar.total / 1024 / 1024).toFixed 1
+	#onProgressThrottled = onProgress # throttle onProgress, 150
+	onProgressThrottled = throttle onProgress, 150
+	asar.opts.onProgress = (total, progress, filename) ->
+		bar.curr += progress
+		onProgressThrottled total, progress, filename
+
 if verbose
-	asar.opts.verbose = yes
 	usageError 'Y U mix --verbose and --quiet ?! U crazy' if quiet
+	asar.opts.verbose = yes
+	filesAdded = []
+	logFilenames =  ->
+		process.stdout.clearLine()
+		process.stdout.cursorTo 0
+		console.log "#{filename}" for filename in filesAdded
+		filesAdded = []
+		bar.tick 0 if bar.curr > 0
+	logFilenamesThrottled = throttle logFilenames, 150
+	asar.opts.onFileBegin = (filename) ->
+		filesAdded.push filename
+		logFilenamesThrottled()
+
 if debug
 	asar.opts.debug = yes
 	usageError 'Y U mix --debug and --quiet ?! U crazy' if quiet
+
 asar.opts.compress = yes if doCompress
 asar.opts.prettyToc = yes if prettyPrint
 
@@ -147,7 +233,7 @@ else if input
 			archive = asar.loadArchive input
 		catch err
 			generalError err.message
-		console.log "verifying #{input.info}" if verbose
+		console.log "verifying #{input.info}" unless quiet
 		archive.verify (err, ok) ->
 			if ok
 				done()
@@ -157,7 +243,7 @@ else if input
 	else if appendDir
 		# append directory to archive
 		usageError 'output and --add not allowed together' if output
-		console.log "adding #{(appendDir + (pattern or '')).info} to #{input.info}" if verbose
+		console.log "adding #{(appendDir + (pattern or '')).info} to #{input.info}" unless quiet
 		archive = asar.loadArchive input
 		archive.addDirectory appendDir,
 			pattern: pattern
@@ -172,13 +258,16 @@ else if input
 		catch err
 			generalError "input not found: #{input}"
 
+		#@opts.onProgress? @_filesSize, chunk.length, filename
+
 		if inputStat.isDirectory()
 			# create archive
-			console.log "packing #{inputPath} to #{output.info}" if verbose
+			usageError 'using --root is not allowed for packing' if root isnt '/'
+			console.log "packing #{inputPath} to #{output.info}" unless quiet
 			asar.createArchive input, output, pattern, done
 		else
 			# extract archive
-			console.log "extracting #{inputPath} to #{output.info}" if verbose
+			console.log "extracting #{inputPath} to #{output.info}" unless quiet
 			asar.extractArchive input, output,
 				root: root
 				pattern: pattern
@@ -190,7 +279,7 @@ else if input
 		#usageError 'Y U mix --list and --quiet ?! makes no sense' if quiet
 		#usageError '--size can only be used with --list' if showListSize and not showList
 
-		console.log "listing #{inputPath}" if verbose
+		#console.log "listing #{inputPath}" unless quiet
 		if showListSize
 			# list archive content with size
 			try

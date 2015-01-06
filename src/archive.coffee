@@ -57,6 +57,7 @@ module.exports = class AsarArchive
 		@_files = []
 		@_filesInternalName = []
 		@_fileNodes = []
+		@_filesSize = 0
 		@_archiveName = null
 		@_dirty = no
 		@_checksum = null
@@ -231,14 +232,19 @@ module.exports = class AsarArchive
 		mkdirp.sync path.dirname archiveName
 
 		writeFile = (filename, out, internalFilename, node, cb) =>
-			console.log "+ #{path.sep}#{internalFilename}" if @opts.verbose
+			#console.log "+ #{path.sep}#{internalFilename}" if @opts.verbose
+			@opts.onFileBegin? path.sep + internalFilename
 
 			realSize = 0
 			src = fs.createReadStream filename
 			
 			if @opts.compress and node.size > @opts.minSizeToCompress
+				if @opts.onProgress?
+					src.on 'data', (chunk) =>
+						@opts.onProgress? @_filesSize, chunk.length, internalFilename
+						return
 				gzip = zlib.createGzip()
-				gzip.on 'data', (chunk) ->
+				gzip.on 'data', (chunk) =>
 					realSize += chunk.length
 					return
 				gzip.on 'end', =>
@@ -250,8 +256,9 @@ module.exports = class AsarArchive
 				src.pipe gzip
 				gzip.pipe out, end: no
 			else
-				src.on 'data', (chunk) ->
+				src.on 'data', (chunk) =>
 					realSize += chunk.length
+					@opts.onProgress? @_filesSize, chunk.length, internalFilename
 					return
 				src.on 'end', =>
 					node.offset = @_offset
@@ -268,12 +275,13 @@ module.exports = class AsarArchive
 				q.defer writeFile, file, out, @_filesInternalName[i], @_fileNodes[i]
 			q.awaitAll (err) =>
 				return cb? err if err
-				@_writeFooter out, (err) ->
+				@_writeFooter out, (err) =>
 					return cb err if err
 					@_dirty = no
 					@_files = []
 					@_filesInternalName = []
 					@_fileNodes = []
+					@_filesSize = 0
 					cb()
 			return
 		
@@ -324,7 +332,7 @@ module.exports = class AsarArchive
 
 		return files
 
-	# shouldn't be public (but it for now because of cli -ls)
+	# shouldn't be public (but is for now because of cli -ls)
 	getMetadata: (filename) ->
 		node = @_searchNode filename, no
 		return node
@@ -372,13 +380,26 @@ module.exports = class AsarArchive
 		else
 			mkdirp.sync dest # create destination directory
 
+		if @opts.onProgress?
+			extractSize = 0
+			for filename in filenames
+				extractSize += @_searchNode(filename).size or 0
+
 		relativeTo = archiveRoot
 		relativeTo = relativeTo.substr 1 if relativeTo[0] in '/\\'.split ''
 		relativeTo = relativeTo[...-1] if relativeTo[-1..] in '/\\'.split ''
 
 		writeStreamToFile = (filename, destFilename, cb) =>
-			console.log "-> #{destFilename}" if @opts.verbose
+			#console.log "-> #{destFilename}" if @opts.verbose
+			
+			@opts.onFileBegin? destFilename
+			
 			inStream = @createReadStream filename
+
+			if @opts.onProgress?
+				inStream.on 'data', (chunk) =>
+					#console.log "onProgress", extractSize, chunk.length, filename
+					@opts.onProgress? extractSize, chunk.length, filename
 
 			out = fs.createWriteStream destFilename
 			out.on 'finish', cb
@@ -441,6 +462,7 @@ module.exports = class AsarArchive
 		@_files.push filename
 		@_filesInternalName.push p
 		@_fileNodes.push node
+		@_filesSize += node.size
 		
 		if process.platform is 'win32' and stat.mode & 0o0100
 			node.executable = true
