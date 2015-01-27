@@ -48,22 +48,22 @@
     <div class="block header">{
   "version": 1,
   "files": {
-    "file1.txt": {"size": 13, "offset": 6},
-    "dir1": {
-      "files": {
-        "file2.txt": {"size": 13, "offset": 19},
-        "file3.txt": {"size": 13, "offset": 32}
-      }
-    },
-    "dir2": {
-      "file4.txt": {"size": 13, "offset": 45},
-      "file5.txt": {"size": 13, "offset": 58}
-    }
+    "file1.txt": {"offset": 6, "size": 13},
+    "dir1": { "files": {
+      "file2.txt": {"offset": 19, "size": 13},
+      "dir3": { "files": {
+        "file3.txt": {"offset": 32, "size": 13}
+      }}
+    }},
+    "dir2": { "files": {
+      "file4.txt": {"offset": 45, "size": 13},
+      "file5.txt": {"offset": 58, "size": 13}
+    }}
   }
 }</div>
     <div class="info">HEADER-SIZE:</div>
-    <div class="block header-size">UINT64 (8 byte)</div>
-    <div class="info">CHECKSUM:</div>
+    <div class="block header-size">UINT32 (4 byte)</div>
+    <div class="info">CHECKSUM: (containes everything up to this point)</div>
     <div class="block checksum">MD5 (16 byte)</div>
     <div class="info">ARCHIVE-SIZE:</div>
     <div class="block archive-size">UINT64 (8 byte)</div>

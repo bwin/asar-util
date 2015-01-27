@@ -98,7 +98,7 @@ else
 usageError = (msg) ->
 	console.error "usage error: #{msg}#{os.EOL}".error
 	help()
-	process.exit -1
+	process.exit 2
 
 generalError = (msg) ->
 	console.error "#{msg}#{os.EOL}".error unless quiet
@@ -178,8 +178,9 @@ unless quiet
 	#onProgressThrottled = onProgress # throttle onProgress, 150
 	onProgressThrottled = throttle onProgress, 150
 	asar.opts.onProgress = (total, progress, filename) ->
-		bar.curr += progress
-		onProgressThrottled total, progress, filename
+		unless bar.complete
+			bar.curr += progress
+			onProgressThrottled total, progress, filename
 
 if verbose
 	usageError 'Y U mix --verbose and --quiet ?! U crazy' if quiet
@@ -210,8 +211,11 @@ if root in ['/', '\\']
 else
 	inputPath.push "#{input}:"
 	inputPath.push root
+
 inputPath.push pattern if pattern
-inputPath = path.join.apply(null, inputPath).info
+
+if input
+	inputPath = path.join.apply(null, inputPath).info
 
 # show usage info (explicit)
 if showHelp
@@ -233,7 +237,7 @@ else if input
 			archive = asar.loadArchive input
 		catch err
 			generalError err.message
-		console.log "verifying #{input.info}" unless quiet
+		console.log "verifying #{input.info}" if verbose
 		archive.verify (err, ok) ->
 			if ok
 				done()
@@ -262,7 +266,7 @@ else if input
 
 		if inputStat.isDirectory()
 			# create archive
-			usageError 'using --root is not allowed for packing' if root isnt '/'
+			usageError 'using --root is not allowed for packing' if root isnt '/' # this should be allowed (for appending at least)
 			console.log "packing #{inputPath} to #{output.info}" unless quiet
 			asar.createArchive input, output, pattern, done
 		else
@@ -279,7 +283,7 @@ else if input
 		#usageError 'Y U mix --list and --quiet ?! makes no sense' if quiet
 		#usageError '--size can only be used with --list' if showListSize and not showList
 
-		#console.log "listing #{inputPath}" unless quiet
+		console.log "listing #{inputPath}" if verbose
 		if showListSize
 			# list archive content with size
 			try

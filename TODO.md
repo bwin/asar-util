@@ -1,5 +1,21 @@
 
 # TODO
+- [ ] ditch cuint because its broken
+- [ ] maybe headerLen as uint32 ? (header > 4.2 GB realistic? hell no) (but archiveSize needs to be uint64)
+- [ ] use combined-stream
+  combinedStream = new CombinedStream()
+  .append (next) -> next fs.createReadStream './LICENSE'
+  .append (next) -> next fs.createReadStream './README.md'
+  IMPORTANTE check for .on 'finish', also check for bytesRead (or out.bytesWritten?)
+  combinedStream.append(stream) Special case: stream can also be a String or Buffer. NICE
+  combinedStream = new CombinedStream()
+  .append 'MAGIC'
+  .append (next) -> next fs.createReadStream './LICENSE'
+  .append (next) -> next fs.createReadStream './LICENSE'
+  .append (next) -> next fs.createReadStream './README.md'
+  .append (next) -> next 'HEADER' + 'HEADERLEN' # async because we may not know the header size before
+  .append (next) -> next 'CHECKSUM' # dont think that works
+  .pipe out
 - [ ] add --info command:
 archive size, dirs, files, links, compsize, decompsize, checksum
 - [ ] use async fs stuff everywhere

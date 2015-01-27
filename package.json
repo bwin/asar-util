@@ -34,7 +34,6 @@
   },
   "license": "MIT",
   "dependencies": {
-    "cuint": "^0.1.5",
     "filesize": "^3.0.0",
     "minimatch": "^2.0.1",
     "minimist": "^1.1.0",

@@ -5,30 +5,33 @@ path = require 'path'
 crypto = require 'crypto'
 stream = require 'stream'
 zlib = require 'zlib'
-UINT64 = require('cuint').UINT64
 
+#UINT64 = require('cuint').UINT64
 walkdir = require 'walkdir'
 minimatch = require 'minimatch'
 mkdirp = require 'mkdirp'
 queue = require 'queue-async'
 
+uint64le = require './uint64le'
+
+#MAX_SAFE_INT32 = ...
 MAX_SAFE_INTEGER = 9007199254740992
 
-writeUINT64 = (buf, val, ofs=0) ->
-	uintval = UINT64 val
-	buf.writeUInt16LE uintval._a00, ofs + 0
-	buf.writeUInt16LE uintval._a16, ofs + 2
-	buf.writeUInt16LE uintval._a32, ofs + 4
-	buf.writeUInt16LE uintval._a48, ofs + 6
-	#console.log "UINT64-conv-write:", val, buf
-	return buf
-
-readUINT64 = (buf, ofs=0) ->
-	lo = buf.readUInt32LE ofs + 0
-	hi = buf.readUInt32LE ofs + 4
-	val = UINT64(lo, hi).toNumber()
-	#console.log "UINT64-conv-read:", val, buf
-	return val
+#writeUINT64 = (buf, val, ofs=0) ->
+#	uintval = UINT64 val
+#	buf.writeUInt16LE uintval._a00, ofs + 0
+#	buf.writeUInt16LE uintval._a16, ofs + 2
+#	buf.writeUInt16LE uintval._a32, ofs + 4
+#	buf.writeUInt16LE uintval._a48, ofs + 6
+#	#console.log "UINT64-conv-write:", val, buf
+#	return buf
+#
+#readUINT64 = (buf, ofs=0) ->
+#	lo = buf.readUInt32LE ofs + 0
+#	hi = buf.readUInt32LE ofs + 4
+#	val = UINT64(lo, hi).toNumber()
+#	#console.log "UINT64-conv-read:", val, buf
+#	return val
 
 sortBy = (prop) -> (a, b) ->
 	return -1 if a[prop] < b[prop]
@@ -97,7 +100,8 @@ module.exports = class AsarArchive
 		headerSizeBuf = new Buffer @SIZELENGTH
 		if fs.readSync(fd, headerSizeBuf, 0, @SIZELENGTH, headerSizeOfs) isnt @SIZELENGTH
 			throw new Error "Unable to read header size: #{@_archiveName}"
-		headerSize = readUINT64 headerSizeBuf
+		#headerSize = readUINT64 headerSizeBuf
+		headerSize = uint64le.bufferToNumber headerSizeBuf
 
 		headerOfs = @_archiveSize - headerSize - (@SIZELENGTH + 16 + @SIZELENGTH) # headerSize, checksum, archiveSize
 		headerBuf = new Buffer headerSize
@@ -154,8 +158,9 @@ module.exports = class AsarArchive
 			headerStr = JSON.stringify @_header
 
 		@_headerSize = headerStr.length
-		headerSizeBuf = new Buffer @SIZELENGTH
-		writeUINT64 headerSizeBuf, @_headerSize
+		#headerSizeBuf = new Buffer @SIZELENGTH
+		#writeUINT64 headerSizeBuf, @_headerSize
+		headerSizeBuf = uint64le.numberToBuffer @_headerSize
 		
 		out.write headerStr, =>
 			out.write headerSizeBuf, =>
@@ -170,7 +175,8 @@ module.exports = class AsarArchive
 					if @_archiveSize > MAX_SAFE_INTEGER
 						return cb? new Error "archive size can not be larger than 9PB"
 					archiveSizeBuf = new Buffer @SIZELENGTH
-					writeUINT64 archiveSizeBuf, @_archiveSize
+					#writeUINT64 archiveSizeBuf, @_archiveSize
+					archiveSizeBuf = uint64le.numberToBuffer @_archiveSize
 
 					out.write @_checksum, ->
 						out.write archiveSizeBuf, cb
